@@ -1,0 +1,15 @@
+*.bat
+*.aps
+*.asmproj
+*.atsln
+*.hex
+*.lst
+*.map
+*.obj
+*.tmp
+*.aws
+*.lss
+*.cap
+*.eep
+*.sav
+
