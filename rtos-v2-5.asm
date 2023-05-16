@@ -861,7 +861,7 @@ suspend_:
 	rjmp	suspend020		; Event already occurred
 
 	std	Z+ioq_timer+0, r22
-	std	Z+conn_ioq+ioq_timer+1, r23
+	std	Z+ioq_timer+1, r23
 	or	r22, r23		; 
 	breq	suspend010		; zero means no timeout
 	sbr	yl, ioq__suspend_bm
@@ -871,16 +871,16 @@ suspend_:
 	#endif
 	lds	yl, ioqueue+0		; get front most queue entry or ZERO if none
 	lds	yh, ioqueue+1		; 
-	std	Z+0, yl			; let new record point to this entry or ZERO
-	std	Z+1, yh
+	std	Z+ioq_link+0, yl	; let new record point to this entry or ZERO
+	std	Z+ioq_link+1, yh
 	sts	ioqueue+0, zl		; make new record to the front most queue entry
 	sts	ioqueue+1, zh
 	lds	yl, runjob+0		; get "us", our job control block
 	lds	yh, runjob+1
 	std	Z+ioq_queue+0, yl	; save it into the ioq control block
 	std	Z+ioq_queue+1, yh	; 
-	ldd	zl, Y+0			; get potential next job or ZERO if none
-	ldd	zh, Y+1
+	ldd	zl, Y+ioq_link+0	; get potential next job or ZERO if none
+	ldd	zh, Y+ioq_link+1
 	sts	runjob+0, zl		; set this or ZEORO as first job in queue
 	sts	runjob+1, zh
 	ldd	zl, Y+jcb_flags		; set the suspend flag in our jcb
@@ -989,13 +989,13 @@ resume030:				; attempt to resume a non-suspended io
 resume040:
 	clr	xl
 	std	Z+ioq_flags, xl		; clear all flag
-	ldd	xl, Z+0			; Remove this io-queue control block
-	ldd	xh, Z+1			; from queue, let previous point to next
-	std	Y+0, xl			; which might be zero in case of last
-	std	Y+1, xh	
+	ldd	xl, Z+ioq_link+0	; Remove this io-queue control block
+	ldd	xh, Z+ioq_link+1	; from queue, let previous point to next
+	std	Y+ioq_link+0, xl	; which might be zero in case of last
+	std	Y+ioq_link+1, xh
 	clr	xl
-	std	Z+0, xl			; Clear the link header in the ioq control block
-	std	Z+1, xl
+	std	Z+ioq_link+0, xl	; Clear the link header in the ioq control block
+	std	Z+ioq_link+1, xl
 	ldd	yl, Z+ioq_queue+0	; Get job control block
 	ldd	yh, Z+ioq_queue+1
 	ldd	xl, Z+ioq_iostat	; Setup return value for job
