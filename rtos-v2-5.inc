@@ -54,7 +54,8 @@ nguard:		.byte	1		; Null Job Stack Guard Byte
 ;			the previous default of 19bytes was not sufficient!
 ;			Therefore null stack has been increased to 39bytes
 ;
-		.byte	39		; Stack of the Null Job
+		.byte	39		; 
+		align	4		; align to nice boundary
 nstack:
 ;
 ;	and of course data sections for the job control blocks (see create:)
