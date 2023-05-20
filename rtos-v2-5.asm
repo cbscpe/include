@@ -1615,8 +1615,7 @@ sigqueue120:
 	cbi	dbg_port, dbg_sigqueue
 	#endif
 	reti
-
-;--------------------------------------------------------------------------
+;--------------------------------------------------------------------------
 ;
 ;	creates a job. you need a job control block setup with the values 
 ;	showed as below. 
@@ -1672,16 +1671,12 @@ sigqueue120:
 ;	
 create:
 	oscall	create_
-
 create_:	
-
 	push	r3			; Save Scratchpad
 	push	r2
 	push	r1
 	push	r0
-	
 	movw	zh:zl, r25:r24		; struct JCB*
-	
 	ldd	r0, Z+jcb_joblist+0
 	ldd	r1, Z+jcb_joblist+1	; Program start to scratchpad
 	movw	r3:r2, yh:yl		; copy Y to scratchpad
@@ -1700,7 +1695,6 @@ create_:
 	st	-Y, r2			;
 	st	-Y, xh
 	st	-Y, xl
-
 ;
 ;	Old and obsolete handling of place for r25:r24
 ;
@@ -1762,4 +1756,3 @@ create_:
 	pop	xh
 	pop	xl
 	rjmp	sysret			; Schedule the created job or return to caller
-

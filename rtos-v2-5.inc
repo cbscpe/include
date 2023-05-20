@@ -47,6 +47,7 @@ curjob:		.byte	2		; Initialise with 0
 hibjob:		.byte	2		; Initialise with 0
 ioqueue:	.byte	2		; Initialise with 0
 iotime:		.byte	2		; Initialise with 0
+tesoutptr:	.byte	1		; Test Output Pointer
 nguard:		.byte	1		; Null Job Stack Guard Byte
 ;
 ;	2022-01-26	The stack of the null job must be as large as all nested
