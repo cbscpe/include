@@ -212,10 +212,70 @@ oscall_:
 	push	zl			; have at least one additional cpu cycle!
 	push	yh
 	push	yl
+;
+;	Testoutput
+;
+#ifdef	tesout
+	cpi	zl, low(delay_)		; 
+	breq	oscall010_
+	push	xl
+	lds	yl, tesoutptr
+	ldi	yh, high(tesoutbuf)
+	st	Y+, zl			; Function call
+	lds	xl, curjob+0
+	st	Y+, xl			; Current Job
+	st	Y+, r20			; All Parameters
+	st	Y+, r21
+	st	Y+, r22
+	st	Y+, r23
+	st	Y+, r24
+	st	Y+, r25
+	sts	tesoutptr, yl
+	pop	xl
+oscall010_:
+#endif
+;
+;
+;
 	sbi	f_RTOS			; Acknowledge interrupt
 	ijmp	
+;
+;
+;
+suspend:
+	oscall	suspend_
 
+acquire:
+	oscall	acquire_
+	
+release:
+	oscall	release_
 
+block:
+	oscall	block_
+
+unblock:
+	oscall	unblock_
+
+delay:
+	oscall	delay_
+
+setpriority:
+	oscall	setpriority_
+
+waitqueue:
+	oscall	waitqueue_
+
+sigqueue:
+	oscall	sigqueue_
+
+create:
+	oscall	create_
+
+tesoutput:
+	oscall	tesoutput_
+tesoutput_:
+	reti
 ;--------------------------------------------------------------------------
 ;
 ;	intsave	- interrupt save routine, this routine is intended for
@@ -758,6 +818,52 @@ iotick120:
 
 ;--------------------------------------------------------------------------
 ;
+;	link a job into a list, jobs are queued with descending priority, at
+;	any given time the highest priority job always is the first in a 
+;	queue.
+;
+;	link is only used within the core OS and is not supposed to be used
+;	by any job.
+;
+;	Z	-->	job control block
+;
+;	Destroys xl, xh
+;
+link:
+	push	yh			; r0==Z
+	push	yl			; r1==X
+					; r2==Y
+	push	r1			; scratch pad
+	push	r0			; scratchpad
+
+	ldd	r1, Z+jcb_priority	; j$priority(r0)
+
+	ldd	xl, Z+jcb_joblist+0	; 
+	ldd	xh, Z+jcb_joblist+1	; mov	j$job.list(r0), r1
+
+link100:			; 100$:
+	ld	yl, X+			;
+	ld	yh, X+			; mov	(r1)+, r2
+	sbiw	yh:yl, 0		; subtract 0 to test for 0
+	breq	link110			; beq	110$
+	ldd	r0, Y+jcb_priority	; j$priority(r2)
+	cp	r0, r1			;
+	brlo	link110			;
+	movw	xh:xl, yh:yl		; mov	r2, r1
+	rjmp	link100			; br	100$
+	
+link110:			; 110$:
+	std	Z+0, yl
+	std	Z+1, yh			; mov	r2, (r0)
+	st	-X, zh
+	st	-X, zl			; mov	r0, -(r1)
+	pop	r0
+	pop	r1
+	pop	yl
+	pop	yh
+	ret	
+;--------------------------------------------------------------------------
+;
 ;	r25:r24	-->	io-queue control block
 ;	r23:r22	-->	timeout
 ;
@@ -776,8 +882,6 @@ iotick120:
 ;	time (32768 seconds = approx 9 hours). If it was left zero
 ;	or negative then it will timeout relatively fast (within seconds)
 ;
-suspend:
-	oscall	suspend_
 suspend_:
 	rtdbg	dbg_suspend, 1
 	movw	zh:zl, r25:r24
@@ -836,6 +940,7 @@ suspend030:
 	rtdbg	dbg_suspend, 0		; *** debugging ***
 	reti
 
+
 ;--------------------------------------------------------------------------
 ;
 ;	Z --->		io-queue control block
@@ -854,6 +959,24 @@ resume:
 	std	Z+ioq_iostat, yl	; Save io status in control block
 	push	yl
 	push	yh
+#ifdef	tesout
+	push	xl
+	mov	xl, yl			; io status
+	lds	yl, tesoutptr
+	ldi	yh, high(tesoutbuf)
+	std	Y+7, zh
+	std	Y+6, zl
+	std	Y+5, xl
+	ldd	xl, Z+ioq_flags
+	std	Y+4, xl
+	ldi	xl, low(resume)
+	std	Y+0, xl
+	lds	xl, curjob+0
+	std	Y+1, xl			; Current Job
+	subi	yl, -8
+	sts	tesoutptr, yl
+	pop	xl
+#endif
 	ldd	yl, Z+ioq_flags
 	sbrc	yl, ioq__suspend_bp
 	rjmp	resume010		; A job is suspended
@@ -922,53 +1045,6 @@ resume040:
 	ret
 ;--------------------------------------------------------------------------
 ;
-;	link a job into a list, jobs are queued with descending priority, at
-;	any given time the highest priority job always is the first in a 
-;	queue.
-;
-;	link is only used within the core OS and is not supposed to be used
-;	by any job.
-;
-;	Z	-->	job control block
-;
-;	Destroys xl, xh
-;
-link:
-	push	yh			; r0==Z
-	push	yl			; r1==X
-					; r2==Y
-	push	r1			; scratch pad
-	push	r0			; scratchpad
-
-	ldd	r1, Z+jcb_priority	; j$priority(r0)
-
-	ldd	xl, Z+jcb_joblist+0	; 
-	ldd	xh, Z+jcb_joblist+1	; mov	j$job.list(r0), r1
-
-link100:			; 100$:
-	ld	yl, X+			;
-	ld	yh, X+			; mov	(r1)+, r2
-	sbiw	yh:yl, 0		; subtract 0 to test for 0
-	breq	link110			; beq	110$
-	ldd	r0, Y+jcb_priority	; j$priority(r2)
-	cp	r0, r1			;
-	brlo	link110			;
-	movw	xh:xl, yh:yl		; mov	r2, r1
-	rjmp	link100			; br	100$
-	
-link110:			; 110$:
-	std	Z+0, yl
-	std	Z+1, yh			; mov	r2, (r0)
-	st	-X, zh
-	st	-X, zl			; mov	r0, -(r1)
-	pop	r0
-	pop	r1
-	pop	yl
-	pop	yh
-	ret	
-
-;--------------------------------------------------------------------------
-;
 ;	Acquires a resource. A resource is a just a word in RAM initialised
 ;	with 0, which means the resource is free. The first job looking for
 ;	a resource will set the value of the resource to 1 , which means in 
@@ -983,8 +1059,6 @@ link110:			; 110$:
 ;
 ;	r24:r25	-> pointer to lock word
 ;
-acquire:
-	oscall	acquire_
 ;
 acquire_:
 	rtdbg	dbg_acquire, 1
@@ -1044,8 +1118,6 @@ acquire120:			; 120$
 ;
 ;	r24:r25	-> pointer to lock word
 ;
-release:
-	oscall	release_
 ;
 release_:				; 
 	rtdbg	dbg_release, 1
@@ -1098,8 +1170,6 @@ release110:				; 110$:
 ;
 ;	r24:r25	-> pointer to lock word
 ;
-block:
-	oscall	block_
 
 block_:
 	rtdbg	dbg_block, 1
@@ -1157,8 +1227,6 @@ block010:
 ;	r25:r24	-> pointer to lock word
 ;
 
-unblock:
-	oscall	unblock_
 unblock_:
 	movw	zh:zl, r25:r24
 ;
@@ -1218,72 +1286,9 @@ unblock060:
 	rjmp	sysret
 ;--------------------------------------------------------------------------
 ;
-;	puts the current job into the hibernate job queue where it will wait
-;	until the number of ticks have been passed. "tick" will decrement
-;	the timer of all hibernated jobs and should the value drop below 0
-;	the job will be put by "tick" from the hibernate queue to the run job
-;	queue.
-;
-;	r24:r25	= ticks to sleep
-;
-delay:
-	oscall	delay_
-
-delay_:
-	lds	yl, runjob+0
-	lds	yh, runjob+1		;;; Get Job
-	std	Y+jcb_joblist+0, r24
-	std	Y+jcb_joblist+1, r25	;;; Set Ticks (reuse joblist word in JCB)
-
-	ldd	zl, Y+jcb_flags
-	sbr	zl, jcb__hibernate_bm
-	std	Y+jcb_flags, zl		;;; Set hibernate flag
-
-	ldd	zl, Y+0
-	ldd	zh, Y+1			;;; Get Next Job (or 0 if this was the last)
-	sts	runjob+0, zl
-	sts	runjob+1, zh		;;; Make it first in runjob
-	lds	zl, hibjob+0
-	lds	zh, hibjob+1
-	std	Y+0, zl
-	std	Y+1, zh
-	sts	hibjob+0, yl
-	sts	hibjob+1, yh		;;; Hibernate the job
-	rjmp	sysret
-;
-;	r24	= priority
-;
-setpriority:
-	oscall	setpriority_
-
-setpriority_:
-	push	xh
-	push	xl
-	lds	yl, runjob+0
-	lds	yh, runjob+1
-	ldd	xl, Y+0
-	ldd	xh, Y+1
-	sts	runjob+0, xl
-	sts	runjob+1, xh		;;; Remove myself from runjob (I'm the first)
-	std	Y+jcb_priority, r24	;;; Set my new priority
-	ldi	xl, low(runjob)
-	ldi	xh, high(runjob)
-	std	Y+jcb_joblist+0, xl
-	std	Y+jcb_joblist+1, xh	;;; Queue me again into the runjob queu
-	ldd	zl, Y+0
-	ldd	zh, Y+1
-	movw	zh:zl, yh:yl
-	rcall	link			;;; Link into runjob according priority
-	pop	xl
-	pop	xh			;;; Restore work register
-	rjmp	sysret			;;; 
-;--------------------------------------------------------------------------
-;
 ;	r25:r24 -->	queue control block
 ;	r23:r22 -->	timeout
 ;
-waitqueue:
-	oscall	waitqueue_
 waitqueue_:
 	rtdbg	dbg_waitqueue, 1	; *** debugging ***
 	movw	zh:zl, r25:r24		; Z=queue control block
@@ -1369,8 +1374,6 @@ waitqueue120:
 ;	r25:r24 -->	queue control block
 ;	r23:r22 -->	record
 ;
-sigqueue:
-	oscall	sigqueue_
 sigqueue_:
 	rtdbg	dbg_sigqueue, 1
 	movw	zh:zl, r25:r24		; Queue Control Block
@@ -1457,6 +1460,62 @@ sigqueue120:
 	reti
 ;--------------------------------------------------------------------------
 ;
+;	puts the current job into the hibernate job queue where it will wait
+;	until the number of ticks have been passed. "tick" will decrement
+;	the timer of all hibernated jobs and should the value drop below 0
+;	the job will be put by "tick" from the hibernate queue to the run job
+;	queue.
+;
+;	r24:r25	= ticks to sleep
+;
+delay_:
+	lds	yl, runjob+0
+	lds	yh, runjob+1		;;; Get Job
+	std	Y+jcb_joblist+0, r24
+	std	Y+jcb_joblist+1, r25	;;; Set Ticks (reuse joblist word in JCB)
+
+	ldd	zl, Y+jcb_flags
+	sbr	zl, jcb__hibernate_bm
+	std	Y+jcb_flags, zl		;;; Set hibernate flag
+
+	ldd	zl, Y+0
+	ldd	zh, Y+1			;;; Get Next Job (or 0 if this was the last)
+	sts	runjob+0, zl
+	sts	runjob+1, zh		;;; Make it first in runjob
+	lds	zl, hibjob+0
+	lds	zh, hibjob+1
+	std	Y+0, zl
+	std	Y+1, zh
+	sts	hibjob+0, yl
+	sts	hibjob+1, yh		;;; Hibernate the job
+	rjmp	sysret
+;
+;	r24	= priority
+;
+
+setpriority_:
+	push	xh
+	push	xl
+	lds	yl, runjob+0
+	lds	yh, runjob+1
+	ldd	xl, Y+0
+	ldd	xh, Y+1
+	sts	runjob+0, xl
+	sts	runjob+1, xh		;;; Remove myself from runjob (I'm the first)
+	std	Y+jcb_priority, r24	;;; Set my new priority
+	ldi	xl, low(runjob)
+	ldi	xh, high(runjob)
+	std	Y+jcb_joblist+0, xl
+	std	Y+jcb_joblist+1, xh	;;; Queue me again into the runjob queu
+	ldd	zl, Y+0
+	ldd	zh, Y+1
+	movw	zh:zl, yh:yl
+	rcall	link			;;; Link into runjob according priority
+	pop	xl
+	pop	xh			;;; Restore work register
+	rjmp	sysret			;;; 
+;--------------------------------------------------------------------------
+;
 ;	creates a job. you need a job control block setup with the values 
 ;	showed as below. 
 ;
@@ -1536,8 +1595,6 @@ sigqueue120:
 ;
 ;	r24:r25	-> pointer to job control block
 ;	
-create:
-	oscall	create_
 create_:	
 	push	r3			; Save Scratchpad
 	push	r2

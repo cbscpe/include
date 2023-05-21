@@ -23,6 +23,7 @@
 ;#define dbg_resumeflag  3
 
 #define	ioticks	1000
+#define	tesout
 
 .macro	rtdbg
 	.ifdef @0
@@ -55,6 +56,10 @@
 ;	data section
 ;
 		.dseg
+#ifdef tesout
+		align	8
+tesoutbuf:	.byte	256
+#endif
 		align	4
 runjob:		.byte	2		; Initialise with 0
 curjob:		.byte	2		; Initialise with 0
@@ -62,6 +67,7 @@ hibjob:		.byte	2		; Initialise with 0
 ioqueue:	.byte	2		; Initialise with 0
 iotime:		.byte	2		; Initialise with 0
 tesoutptr:	.byte	1		; Test Output Pointer
+tesoutfnc:	.byte	1		; Test Output Function Code
 nguard:		.byte	1		; Null Job Stack Guard Byte
 ;
 ;	2022-01-26	The stack of the null job must be as large as all nested
