@@ -424,36 +424,16 @@ sysext:	pop	yl			; unwind minimal context
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_sysrun
-	cbi	dbg_port, dbg_sysrun
-	#endif
-	#ifdef dbg_sysret
-	cbi	dbg_port, dbg_sysret
-	#endif
-	#ifdef dbg_tick
-	cbi	dbg_port, dbg_tick
-	#endif
-	#ifdef dbg_block
-	cbi	dbg_port, dbg_block
-	#endif
-	#ifdef dbg_unblock
-	cbi	dbg_port, dbg_unblock
-	#endif
-	#ifdef dbg_release
-	cbi	dbg_port, dbg_release
-	#endif
-	#ifdef dbg_acquire
-	cbi	dbg_port, dbg_acquire
-	#endif
-	#ifdef dbg_null
-	cbi	dbg_port, dbg_null
-	#endif
-	#ifdef dbg_suspend
-	cbi	dbg_port, dbg_suspend
-	#endif
-	#ifdef dbg_resume
-	cbi	dbg_port, dbg_resume
-	#endif
+	rtdbg	dbg_sysrun, 0
+	rtdbg	dbg_sysret, 0
+	rtdbg	dbg_tick, 0
+	rtdbg	dbg_block, 0
+	rtdbg	dbg_unblock, 0
+	rtdbg	dbg_release, 0
+	rtdbg	dbg_acquire, 0
+	rtdbg	dbg_null, 0
+	rtdbg	dbg_suspend, 0
+	rtdbg	dbg_resume, 0
 	reti
 ;--------------------------------------------------------------------------
 ;
@@ -473,9 +453,7 @@ sysext:	pop	yl			; unwind minimal context
 ;	R8 contains the saved SREG value
 ;
 sysret:
-	#ifdef dbg_sysret
-	sbi	dbg_port, dbg_sysret
-	#endif
+	rtdbg	dbg_sysret, 1
 	lds	zl, curjob+0		;;; Z = curjob
 	lds	zh, curjob+1
 	lds	yl, runjob+0		;;; Y = runjob
@@ -522,9 +500,7 @@ sysret:
 ;	All Register are now saved we can now load a new context
 ;
 sysrun:	
-	#ifdef dbg_sysrun
-	sbi	dbg_port, dbg_sysrun
-	#endif
+	rtdbg	dbg_sysrun, 1
 	sbiw	yh:yl, 0		;;; Test runjob
 	breq	sysnul			;;; No next job to run
 	sts	curjob+0, yl
@@ -567,30 +543,14 @@ sysrun:
 	pop	zh			;;; 
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_sysrun
-	cbi	dbg_port, dbg_sysrun
-	#endif
-	#ifdef dbg_sysret
-	cbi	dbg_port, dbg_sysret
-	#endif
-	#ifdef dbg_tick
-	cbi	dbg_port, dbg_tick
-	#endif
-	#ifdef dbg_block
-	cbi	dbg_port, dbg_block
-	#endif
-	#ifdef dbg_unblock
-	cbi	dbg_port, dbg_unblock
-	#endif
-	#ifdef dbg_sysnul
-	cbi	dbg_port, dbg_sysnul
-	#endif
-	#ifdef dbg_acquire
-	cbi	dbg_port, dbg_acquire
-	#endif
-	#ifdef dbg_release
-	cbi	dbg_port, dbg_release
-	#endif
+	rtdbg	dbg_sysrun, 0
+	rtdbg	dbg_sysret, 0
+	rtdbg	dbg_tick, 0
+	rtdbg	dbg_block, 0
+	rtdbg	dbg_unblock, 0
+	rtdbg	dbg_sysnul, 0
+	rtdbg	dbg_acquire, 0
+	rtdbg	dbg_release, 0
 	reti
 
 ;--------------------------------------------------------------------------
@@ -598,30 +558,14 @@ sysrun:
 ;	Preparing for the NULL job
 ;
 sysnul:
-	#ifdef dbg_sysrun
-	cbi	dbg_port, dbg_sysrun
-	#endif
-	#ifdef dbg_sysret
-	cbi	dbg_port, dbg_sysret
-	#endif
-	#ifdef dbg_tick
-	cbi	dbg_port, dbg_tick
-	#endif
-	#ifdef dbg_block
-	cbi	dbg_port, dbg_block
-	#endif
-	#ifdef dbg_unblock
-	cbi	dbg_port, dbg_unblock
-	#endif
-	#ifdef dbg_acquire
-	cbi	dbg_port, dbg_acquire
-	#endif
-	#ifdef dbg_release
-	cbi	dbg_port, dbg_release
-	#endif
-	#ifdef dbg_suspend
-	cbi	dbg_port, dbg_suspend
-	#endif
+	rtdbg	dbg_sysrun, 0
+	rtdbg	dbg_sysret, 0
+	rtdbg	dbg_tick, 0
+	rtdbg	dbg_block, 0
+	rtdbg	dbg_unblock, 0
+	rtdbg	dbg_acquire, 0
+	rtdbg	dbg_release, 0
+	rtdbg	dbg_suspend, 0
 	clr	zl
 	sts	curjob+0, zl		;;; no current user job
 	sts	curjob+1, zl
@@ -639,9 +583,7 @@ sysnul:
 ;
 nulljob:
 ;	cli
-;	#ifdef dbg_sysnul
-;	sbi	dbg_port, dbg_sysnul
-;	#endif
+;	rtdbg	dbg_sysnul, 1
 ;	.ifdef SLPCTRL_CTRLA
 ;	ldi	r16, SLPCTRL_SMODE_IDLE_gc+SLPCTRL_SEN_bm
 ;	sts	SLPCTRL_CTRLA, r16
@@ -652,9 +594,7 @@ nulljob:
 ;	.endif
 ;	sei
 ;	sleep
-;	#ifdef dbg_sysnul
-;	sbi	dbg_port, dbg_sysnul
-;	#endif
+;	rtdbg	dbg_sysnul, 1
 	rjmp	nulljob			; No job scheduled, so just loop
 ;--------------------------------------------------------------------------
 ;
@@ -664,9 +604,7 @@ nulljob:
 ;	this routine as the interrupt service routine.
 ;
 tick:
-#ifdef dbg_tick
-	sbi	dbg_port, dbg_tick
-#endif
+	rtdbg	dbg_tick, 1
 	push	r8			;;; 
 	in	r8, CPU_SREG		;;;
 	push	zh			;;;
@@ -686,8 +624,6 @@ tick:
 	push	yh			;;; Save standard registers
 	push	yl
 	rjmp	sysret			;;; Never take a quick exit after iotick
-
-
 tick130:
 	lds	zl, hibjob+0
 	lds	zh, hibjob+1		;;; get job to look at
@@ -695,13 +631,10 @@ tick130:
 	brne	tick100			;;; found one
 	pop	zl			;;; else do a quick exit
 	pop	zh
-#ifdef dbg_tick
-	cbi	dbg_port, dbg_tick
-#endif
+	rtdbg	dbg_tick, 0
 	out	CPU_SREG, r8		;;; we always return from the timer interrupt
 	pop	r8
 	reti
-;
 ;
 tick100:
 	push	yh
@@ -717,10 +650,10 @@ tick110:
 	std	Z+jcb_joblist+0,xl
 	std	Z+jcb_joblist+1,xh
 	brpl	tick120
-	ldd	xl, Z+0
-	ldd	xh, Z+1
-	std	Y+0, xl
-	std	Y+1, xh
+	ldd	xl, Z+jcb_link+0
+	ldd	xh, Z+jcb_link+1
+	std	Y+jcb_link+0, xl
+	std	Y+jcb_link+1, xh
 	ldi	xl, low(runjob)
 	ldi	xh, high(runjob)
 	std	Z+jcb_joblist+0, xl
@@ -732,8 +665,8 @@ tick110:
 	movw	zh:zl, yh:yl
 tick120:
 	movw	yh:yl, zh:zl
-	ldd	zl, Y+0
-	ldd	zh, Y+1
+	ldd	zl, Y+jcb_link+0
+	ldd	zh, Y+jcb_link+1
 	sbiw	zh:zl, 0
 	brne	tick110
 	pop	xl
@@ -761,9 +694,7 @@ iotick:
 	ret
 	
 iotick100:				; We have at least one block in the queue
-#ifdef dbg_iotick
-	sbi	dbg_port, dbg_iotick
-#endif
+	rtdbg	dbg_iotick, 1
 	push	yh			; So save resgister we need
 	push	yl
 	push	xh
@@ -790,9 +721,7 @@ iotick110:
 	ldd	xl, Z+ioq_flags		; update io conrol block flags
 	cbr	xl, ioq__suspend_bm | ioq__job_bm
 	std	Z+ioq_flags, xl		; Set timeout flag in ioq control block
-	#ifdef dbg_suspendflag
-	cbi	dbg_port, dbg_suspendflag
-	#endif
+	rtdbg	dbg_suspendflag, 0
 	ldd	xl, Z+ioq_queue+0	; Get job control block of waiting job
 	ldd	xh, Z+ioq_queue+1
 	clr	yl
@@ -816,17 +745,15 @@ iotick110:
 	pop	zh			; 
 iotick120:
 	movw	yh:yl, zh:zl		; Make this block to the previous
-	ldd	zl, Y+0			; Get next block
-	ldd	zh, Y+1
+	ldd	zl, Y+ioq_link+0	; Get next block
+	ldd	zh, Y+ioq_link+1
 	sbiw	zh:zl, 0
 	brne	iotick110		; Yes there is another one
 	pop	xl
 	pop	xh
 	pop	yl
 	pop	yh
-#ifdef dbg_iotick
-	cbi	dbg_port, dbg_iotick
-#endif
+	rtdbg	dbg_iotick, 0
 	ret
 
 ;--------------------------------------------------------------------------
@@ -852,9 +779,7 @@ iotick120:
 suspend:
 	oscall	suspend_
 suspend_:
-	#ifdef dbg_suspend		; *** debugging ***
-	sbi	dbg_port, dbg_suspend
-	#endif
+	rtdbg	dbg_suspend, 1
 	movw	zh:zl, r25:r24
 	ldd	yl, Z+ioq_flags
 	sbrc	yl, ioq__resume_bp
@@ -866,9 +791,7 @@ suspend_:
 	breq	suspend010		; zero means no timeout
 	sbr	yl, ioq__suspend_bm
 	std	Z+ioq_flags, yl
-	#ifdef dbg_suspendflag		; *** debugging ***
-	sbi	dbg_port, dbg_suspendflag
-	#endif
+	rtdbg	dbg_suspendflag, 1	; *** debugging ***
 	lds	yl, ioqueue+0		; get front most queue entry or ZERO if none
 	lds	yh, ioqueue+1		; 
 	std	Z+ioq_link+0, yl	; let new record point to this entry or ZERO
@@ -902,9 +825,7 @@ suspend020:
 
 suspend030:
 	cbr	yl, ioq__resume_bm	; Acknowledge event
-	#ifdef dbg_resumeflag		; *** debugging ***
-	cbi	dbg_port, dbg_resumeflag
-	#endif
+	rtdbg	dbg_resumeflag, 0	; *** debugging ***
 	std	Z+ioq_flags, yl
 	pop	yl
 	pop	yh
@@ -912,9 +833,7 @@ suspend030:
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_suspend		; *** debugging ***
-	cbi	dbg_port, dbg_suspend
-	#endif
+	rtdbg	dbg_suspend, 0		; *** debugging ***
 	reti
 
 ;--------------------------------------------------------------------------
@@ -931,9 +850,7 @@ suspend030:
 ;	be updated accordingly
 ;
 resume:
-	#ifdef dbg_resume		; *** debugging ***
-	sbi	dbg_port, dbg_resume
-	#endif
+	rtdbg	dbg_resume, 1		; *** debugging ***
 	std	Z+ioq_iostat, yl	; Save io status in control block
 	push	yl
 	push	yh
@@ -941,9 +858,7 @@ resume:
 	sbrc	yl, ioq__suspend_bp
 	rjmp	resume010		; A job is suspended
 	sbr	yl, ioq__resume_bm	; Signal event already occurred
-	#ifdef dbg_resumeflag		; *** debugging ***
-	sbi	dbg_port, dbg_resumeflag
-	#endif
+	rtdbg	dbg_resumeflag, 1		; *** debugging ***
 	std	Z+ioq_flags, yl		;
 	pop	yl
 	pop	yh
@@ -954,8 +869,8 @@ resume010:
 	ldi	yl, low(ioqueue)
 	ldi	yh, high(ioqueue)
 resume020:
-	ldd	xl, Y+0
-	ldd	xh, Y+1
+	ldd	xl, Y+ioq_link+0
+	ldd	xh, Y+ioq_link+1
 	sbiw	xh:xl, 0
 	breq	resume030		; must never happen
 	cp	xl, zl
@@ -969,21 +884,6 @@ resume030:				; attempt to resume a non-suspended io
 	pop	xh
 	pop	yl
 	pop	yh
-	#ifdef dbg_resume		; *** debugging ***
-	cbi	dbg_port, dbg_resume
-	rjmp	PC+1
-	rjmp	PC+1
-	sbi	dbg_port, dbg_resume
-	rjmp	PC+1
-	rjmp	PC+1
-	cbi	dbg_port, dbg_resume
-	rjmp	PC+1
-	rjmp	PC+1
-	sbi	dbg_port, dbg_resume
-	rjmp	PC+1
-	rjmp	PC+1
-	cbi	dbg_port, dbg_resume
-	#endif
 	ret				; Nothing to resume
 	
 resume040:
@@ -1010,9 +910,7 @@ resume040:
 	std	Y+jcb_joblist+1, xh	; Set queue
 	ldd	xl, Y+jcb_flags
 	cbr	xl, jcb__suspend_bm
-	#ifdef dbg_suspendflag			; *** debugging ***
-	cbi	dbg_port, dbg_suspendflag
-	#endif
+	rtdbg	dbg_suspendflag, 0			; *** debugging ***
 	std	Y+jcb_flags, xl
 	movw	zh:zl, yh:yl
 	rcall	link
@@ -1020,9 +918,7 @@ resume040:
 	pop	xh
 	pop	yl
 	pop	yh
-	#ifdef dbg_resume		; *** debugging ***
-	cbi	dbg_port, dbg_resume
-	#endif
+	rtdbg	dbg_resume, 0		; *** debugging ***
 	ret
 ;--------------------------------------------------------------------------
 ;
@@ -1091,9 +987,7 @@ acquire:
 	oscall	acquire_
 ;
 acquire_:
-#ifdef dbg_acquire
-	sbi	dbg_port, dbg_acquire
-#endif
+	rtdbg	dbg_acquire, 1
 	movw	zh:zl, r25:r24		;
 	ldd	yl, Z+0			; r1==Z
 	ldd	yh, Z+1			; r0==Y
@@ -1109,33 +1003,31 @@ acquire_:
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-#ifdef dbg_acquire
-	cbi	dbg_port, dbg_acquire
-#endif
+	rtdbg	dbg_acquire, 0
 	reti
 
-acquire100:			; 100$:
+acquire100:				; 100$:
 	push	xh
 	push	xl
 	lds	yl, runjob+0		; mov	runjob, r0
 	lds	yh, runjob+1
-	ldd	xl, Y+0
-	ldd	xh, Y+1			;
+	ldd	xl, Y+jcb_link+0
+	ldd	xh, Y+jcb_link+1	;
 	sts	runjob+0, xl
 	sts	runjob+1, xh		; mov	(r0) ,runjob
 	std	Y+jcb_joblist+0, zl
 	std	Y+jcb_joblist+1, zh	; mov	r1, j$job.list(r0)
-	ldd	xl, Z+0
+	ldd	xl, Z+0			; get lock status, 
 	ldd	xh, Z+1			;
 	sbiw	xh:xl, 1		; cmp	#1, (r1)
 	brne	acquire110		; bne	110$
-	std	Z+0, yl			;
+	std	Z+0, yl			; We are the first waiting for the lock
 	std	Z+1, yh			; mov	r0, (r1)
-	std	Y+0, xl			; Note xh:xl is actually zero here
-	std	Y+1, xh			; clr	(r0)
+	std	Y+jcb_link+0, xl	; Note xh:xl is actually zero here
+	std	Y+jcb_link+1, xh	; clr	(r0)
 	rjmp	acquire120		; br	120$
 acquire110:			; 110$:
-	movw	zh:zl, yh:yl
+	movw	zh:zl, yh:yl		; if we are not the first queue ourselves
 	rcall	link			; jsr	pc, link
 acquire120:			; 120$
 	pop	xl
@@ -1143,13 +1035,12 @@ acquire120:			; 120$
 	rjmp	sysret			; 
 ;--------------------------------------------------------------------------
 ;
-;	Release does as the name says release a resource, only the current job
-;	can release a resource and we do not check whether the current job
-;	was the job that acquired the resource. If a resource was acquired
-;	and in the meantime other jobs asked for this resource the first
-;	job will be removed from the queue and inserted into the run job queue.
-;
-;	New system call model
+;	Release does, as the name says, release a resource, only the current
+;	job must release a resource and we do not check whether the current 
+;	job was the job that acquired the resource. If a resource was       
+;	acquired and in the meantime other jobs asked for this resource the 
+;	first job will be removed from the queue and inserted into the run  
+;	job queue. Also you must not release a free resource.
 ;
 ;	r24:r25	-> pointer to lock word
 ;
@@ -1157,42 +1048,38 @@ release:
 	oscall	release_
 ;
 release_:				; 
-#ifdef dbg_release
-	sbi	dbg_port, dbg_release
-#endif
+	rtdbg	dbg_release, 1
 	movw	zh:zl, r25:r24		; r0==Y
 	ldd	yl, Z+0			; r1==Z
 	ldd	yh, Z+1			; mov	(r1), r0
 	sbiw	yh:yl, 1		; cmp 	r0, #1
 	brne	release100		; bne	100$
-	std	Z+0, yl
+	std	Z+0, yl			; no other job acquired the lock so
 	std	Z+1, yh			; clr	(r1)
-	pop	yl
+	pop	yl			; we just need to set it to available == 0
 	pop	yh
 	pop	zl
 	pop	zh
-#ifdef dbg_release
-	cbi	dbg_port, dbg_release
-#endif
+	rtdbg	dbg_release, 0
 	out	CPU_SREG, r8
 	pop	r8
 	reti
 
-release100:			; 100$:	
+release100:				; 100$:	
 	push	xh
 	push	xl
 	adiw	yh:yl, 1		; restore Y pointer
-	ldd	xl, Y+0	
-	ldd	xh, Y+1
-	std	Z+0, xl
-	std	Z+1, xh			; mov	(r0), (r1)
-	sbiw	xh:xl, 0		; subtract 0 to test for 0
-	brne	release110		; bne	110$
+	ldd	xl, Y+jcb_link+0	; Unlink the jcb of waiting job. You must
+	ldd	xh, Y+jcb_link+1	; not release an free resource, this would
+	std	Z+jcb_link+0, xl	; be fatal here.
+	std	Z+jcb_link+1, xh	; mov	(r0), (r1)
+	sbiw	xh:xl, 0		; subtract 0 to test for 0 (last job)
+	brne	release110		; bne	110$ 
 	ldi	xl, low(1)		; Even for small numbers it is better to use		
 	ldi	xh, high(1)		; low() and high() to make sure it is correct!
 	std	Z+0, xl
 	std	Z+1, xh			; mov	#1, (r1)
-release110:			; 110$:
+release110:				; 110$:
 	ldi	zl, low(runjob)
 	ldi	zh, high(runjob)
 	std	Y+jcb_joblist+0, zl
@@ -1215,9 +1102,7 @@ block:
 	oscall	block_
 
 block_:
-	#ifdef dbg_block
-	sbi	dbg_port, dbg_block
-	#endif
+	rtdbg	dbg_block, 1
 	movw	zh:zl, r25:r24
 	ldd	yl, Z+0
 	ldd	yh, Z+1
@@ -1231,9 +1116,7 @@ block_:
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_block
-	cbi	dbg_port, dbg_block
-	#endif
+	rtdbg	dbg_block, 0
 	reti
 
 block010:
@@ -1251,9 +1134,7 @@ block010:
 	std	Y+jcb_joblist+1, zh	;;; set the block queue address
 	movw	zh:zl, yh:yl		;;; link this job to the block queue
 	rcall	link			;;; place it into the linked list
-	#ifdef dbg_block
-	cbi	dbg_port, dbg_block
-	#endif
+	rtdbg	dbg_block, 0
 	pop	xl
 	pop	xh
 	rjmp	sysret
@@ -1291,9 +1172,7 @@ unblock_:
 ;	Z 	-> pointer to lock word
 ;
 unblocki:				;;; Entry for interrupt service routines
-	#ifdef dbg_unblock
-	sbi	dbg_port, dbg_unblock
-	#endif
+	rtdbg	dbg_unblock, 1
 	ldd	yl, Z+0
 	ldd	yh, Z+1			;;; Get block status
 	sbiw	yh:yl, 1		;;; Has event already occured
@@ -1304,9 +1183,7 @@ unblocki:				;;; Entry for interrupt service routines
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_unblock
-	cbi	dbg_port, dbg_unblock
-	#endif
+	rtdbg	dbg_unblock, 0
 	reti
 unblock040:
 	adiw	yh:yl, 1		;;; Restore block status
@@ -1320,9 +1197,7 @@ unblock040:
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_unblock
-	cbi	dbg_port, dbg_unblock
-	#endif
+	rtdbg	dbg_unblock, 0
 	reti
 unblock060:
 	push	xh
@@ -1337,9 +1212,7 @@ unblock060:
 	std	Z+1, xh			;;; and set it as next in block queue
 	movw	zh:zl, yh:yl		;;; set address of jcb
 	rcall	link			;;; link it into the runjob queue
-	#ifdef dbg_unblock
-	cbi	dbg_port, dbg_unblock
-	#endif
+	rtdbg	dbg_unblock, 0
 	pop	xl
 	pop	xh
 	rjmp	sysret
@@ -1392,7 +1265,7 @@ setpriority_:
 	ldd	xh, Y+1
 	sts	runjob+0, xl
 	sts	runjob+1, xh		;;; Remove myself from runjob (I'm the first)
-	std	Y+jcb_priority, zl	;;; Set my new priority
+	std	Y+jcb_priority, r24	;;; Set my new priority
 	ldi	xl, low(runjob)
 	ldi	xh, high(runjob)
 	std	Y+jcb_joblist+0, xl
@@ -1412,9 +1285,7 @@ setpriority_:
 waitqueue:
 	oscall	waitqueue_
 waitqueue_:
-	#ifdef dbg_waitqueue		; *** debugging ***
-	sbi	dbg_port, dbg_waitqueue
-	#endif
+	rtdbg	dbg_waitqueue, 1	; *** debugging ***
 	movw	zh:zl, r25:r24		; Z=queue control block
 	ldd	yl, Z+ioq_flags
 	sbrs	yl, ioq__record_bp	
@@ -1438,9 +1309,7 @@ waitqueue010:
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_waitqueue		; *** debugging ***
-	cbi	dbg_port, dbg_waitqueue
-	#endif
+	rtdbg	dbg_waitqueue, 0	; *** debugging ***
 	reti				; and just return
 
 waitqueue100:				; no records queued
@@ -1454,9 +1323,7 @@ waitqueue100:				; no records queued
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_waitqueue		; *** debugging ***
-	cbi	dbg_port, dbg_waitqueue
-	#endif
+	rtdbg	dbg_waitqueue, 0	; *** debugging ***
 	reti				; and just return
 
 waitqueue110:				; no record and no job is waiting
@@ -1472,9 +1339,7 @@ waitqueue110:				; no record and no job is waiting
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_waitqueue		; *** debugging ***
-	cbi	dbg_port, dbg_waitqueue
-	#endif
+	rtdbg	dbg_waitqueue, 0	; *** debugging ***
 	reti				; and just return
 	
 waitqueue120:
@@ -1497,9 +1362,7 @@ waitqueue120:
 	ldd	zh, Y+1
 	sts	runjob+0, zl		; set this or ZEORO s first job in queue
 	sts	runjob+1, zh
-	#ifdef dbg_waitqueue		; *** debugging ***
-	cbi	dbg_port, dbg_waitqueue
-	#endif
+	rtdbg	dbg_waitqueue, 0	; *** debugging ***
 	rjmp	sysret			; reschedule
 ;--------------------------------------------------------------------------
 ;
@@ -1509,9 +1372,7 @@ waitqueue120:
 sigqueue:
 	oscall	sigqueue_
 sigqueue_:
-	#ifdef dbg_sigqueue
-	sbi	dbg_port, dbg_sigqueue
-	#endif
+	rtdbg	dbg_sigqueue, 1
 	movw	zh:zl, r25:r24		; Queue Control Block
 	ldd	yl, Z+ioq_flags
 	sbrs	yl, ioq__job_bp
@@ -1534,23 +1395,6 @@ sigqueue020:
 sigqueue030:				; this must not happen as we cannot 
 	pop	xl			; signal a record to a control block
 	pop	xh			; with a job waiting but not in the ioqueue
-	#ifdef dbg_sigqueue
-	cbi	dbg_port, dbg_sigqueue
-	rjmp	PC+1
-	rjmp	PC+1
-	sbi	dbg_port, dbg_sigqueue
-	rjmp	PC+1
-	rjmp	PC+1
-	cbi	dbg_port, dbg_sigqueue
-	sbi	dbg_port, dbg_sigqueue
-	rjmp	PC+1
-	rjmp	PC+1
-	cbi	dbg_port, dbg_sigqueue
-	sbi	dbg_port, dbg_sigqueue
-	rjmp	PC+1
-	rjmp	PC+1
-	cbi	dbg_port, dbg_sigqueue
-	#endif
 	rjmp	sysret
 
 sigqueue040:				; we found our control block note X=Z=current
@@ -1580,9 +1424,7 @@ sigqueue040:				; we found our control block note X=Z=current
 	std	Z+26, r23		; saved on the stack of this job
 	movw	zh:zl, yh:yl		; job control block
 	rcall	link			; Put the job into the runjob queue
-	#ifdef dbg_sigqueue
-	cbi	dbg_port, dbg_sigqueue
-	#endif
+	rtdbg	dbg_sigqueue, 0
 	pop	xl			; no longer needed
 	pop	xh
 	rjmp	sysret			; reschedule
@@ -1611,9 +1453,7 @@ sigqueue120:
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	#ifdef dbg_sigqueue
-	cbi	dbg_port, dbg_sigqueue
-	#endif
+	rtdbg	dbg_sigqueue, 0
 	reti
 ;--------------------------------------------------------------------------
 ;
@@ -1637,12 +1477,39 @@ sigqueue120:
 ;			.byte	1	; Flags	
 ;
 ;	Result
-;	SP	-->	.byte	stacksize-35
-;			.byte	r0
-;			.byte	r1
-;			.
-;			.
-;			.byte	zh
+;	SP	-->	.byte	stacksize-35	the pointer saved in jcb_stack
+;			.byte	r0		Y+1
+;			.byte	r1		Y+2
+;			.byte	r2		Y+3
+;			.byte	r3		Y+4
+;			.byte	r4		Y+5
+;			.byte	r5		Y+6
+;			.byte	r6		Y+7
+;			.byte	r7		Y+8
+;			.byte	sreg		Y+9
+;			.byte	r9		Y+10
+;			.byte	r10		Y+11
+;			.byte	r11		Y+12
+;			.byte	r12		Y+13
+;			.byte	r13		Y+14
+;			.byte	r14		Y+15
+;			.byte	r15		Y+16
+;			.byte	r16		Y+17
+;			.byte	r17		Y+18
+;			.byte	r18		Y+19
+;			.byte	r19		Y+20
+;			.byte	r20		Y+21
+;			.byte	r21		Y+22
+;			.byte	r22		Y+23
+;			.byte	r23		Y+24
+;			.byte	r24		Y+25
+;			.byte	r25		Y+26
+;			.byte	r26;xl
+;			.byte	r27;xh
+;			.byte	r28;yl
+;			.byte	r29;yh
+;			.byte	r30;zl
+;			.byte	r31;zh
 ;			.byte	r8
 ;			.byte	pcl
 ;			.byte	pch

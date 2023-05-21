@@ -14,6 +14,7 @@
 ;#define dbg_tick	6
 ;#define dbg_sysnul	7
 ;#define dbg_suspend     0
+;.equ	dbg_suspend	= 0
 ;#define dbg_resume      1
 ;#define dbg_sigqueue     0
 ;#define dbg_waitqueue    1
@@ -23,6 +24,16 @@
 
 #define	ioticks	1000
 
+.macro	rtdbg
+	.ifdef @0
+	.if @1 == 1
+	sbi	dbg_port, @0
+	.endif
+	.if @1 == 0
+	cbi	dbg_port, @0
+	.endif
+	.endif
+.endm
 ;--------------------------------------------------------------------------
 ;
 ;	Reset the TICK timer interrupt, this depends on the MCU
@@ -33,7 +44,10 @@
 	ldi	zl, TCB_CAPT_bm
 	sts	TCB0_INTFLAGS, zl
 	.endmacro
-
+	.macro	ack_pit_interrupt
+	ldi	zl, RTC_PI_bm
+	sts	RTC_PITINTFLAGS, zl
+	.endmacro
 ;--------------------------------------------------------------------------
 ;
 ;	A minimal set of routines that allow parallel jobs on a AVR
