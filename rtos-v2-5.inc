@@ -4,7 +4,6 @@
 ;	RT-OS using a Logic Analyzer. Normally not activated.
 ;
 #define	dbg_port	VPORTD_OUT	; Use the Data Port
-;
 ;#define dbg_sysret	0
 ;#define dbg_sysrun	1
 ;#define dbg_block	2
@@ -24,7 +23,29 @@
 
 #define	ioticks	1000
 #define	tesout
+;
+;	Identification values 
+;
+#define chk_suspend	0x10
+#define chk_acquire	0x20
+#define	chk_release	0x30
+#define	chk_block	0x40
+#define	chk_unblock	0x50
+#define	chk_delay	0x60
+#define	chk_setpriority	0x70
+#define	chk_waitqueue	0x80
+#define	chk_sigqueue	0x90
+#define	chk_create	0xA0
+#define	chk_resume	0xB0
+#define chk_iotick	0xC0
+#define	chk_tesout	0xD0
 
+#define crash_nojob	0xFE
+#define	crash_spurious	0xFF
+;--------------------------------------------------------------------------
+;
+;	Debugging and Test Output
+;
 .macro	rtdbg
 	.ifdef @0
 	.if @1 == 1
@@ -35,7 +56,62 @@
 	.endif
 	.endif
 .endm
-;--------------------------------------------------------------------------
+;
+;	Check that the address is a valid RAM address else call crashdump
+;
+.macro	chkaddr
+	sbiw	@0:@1, 0
+	breq	c020
+	cpi	@0, 0x40
+	brlo	c010
+	cpi	@0, 0x70
+	brlo	c020
+c010:
+	ldi	r16, @2
+	jmp	crash
+c020:
+.endm
+;--------------------------------------------------------------------------
+;
+;	Testoutput Macros
+;
+;	During each call a testoutput entry is created in the buffer 
+;	"tesoutent" and depending on the settings this buffer is then
+;	placed into the circular testoutput buffer typically located
+;	at 0x7000 in RAM
+;
+;	Entry Test Output Macro that sets the function code and the
+;	low byte of job control block address. We assume that job
+;	control blocks are defined in a contiguous block of RAM and
+;	that we typically do not have more than a few jobs, so the
+;	low-byte of the JCB identifies the job
+;
+.macro	tesoute
+#ifdef	tesout
+	sts	tesoutent+4, @1	; Save Registers in Testoutput
+	sts	tesoutent+5, @2
+
+	ldi	@1, @0		; Set the ID in Testoutput
+	sts	tesoutent+0, @1
+	lds	@1, curjob	; Current Job (not always true e.g. in interrupts)
+	sts	tesoutent+1, @1
+
+	sts	tesoutent+2, @3	; Paramter
+	sts	tesoutent+3, @4
+	lds	@1, tesoutent+4	; Restore Registers
+	lds	@2, tesoutent+5
+#endif
+.endm
+
+.macro	tesflag
+#ifdef	tesout
+	lds	@1, tesoutent
+	ori	@1, @0
+	sts	tesoutent, @1
+#endif
+.endm
+
+;--------------------------------------------------------------------------
 ;
 ;	Reset the TICK timer interrupt, this depends on the MCU
 ;
@@ -57,8 +133,8 @@
 ;
 		.dseg
 #ifdef tesout
-		align	8
-tesoutbuf:	.byte	256
+.equ	tesoutbuf	= 0x7000
+.equ	tesoutlen	= 0x0800
 #endif
 		align	4
 runjob:		.byte	2		; Initialise with 0
@@ -66,8 +142,10 @@ curjob:		.byte	2		; Initialise with 0
 hibjob:		.byte	2		; Initialise with 0
 ioqueue:	.byte	2		; Initialise with 0
 iotime:		.byte	2		; Initialise with 0
-tesoutptr:	.byte	1		; Test Output Pointer
-tesoutfnc:	.byte	1		; Test Output Function Code
+tesoutptr:	.byte	2		; Test Output Pointer
+tesimpure:	.byte	4
+tesoutent:	.byte	8		
+intlevel:	.byte	1
 nguard:		.byte	1		; Null Job Stack Guard Byte
 ;
 ;	2022-01-26	The stack of the null job must be as large as all nested
@@ -75,7 +153,7 @@ nguard:		.byte	1		; Null Job Stack Guard Byte
 ;			the previous default of 19bytes was not sufficient!
 ;			Therefore null stack has been increased to 39bytes
 ;
-		.byte	39		; 
+		.byte	39		; minimum amount of stack for null job
 		align	4		; align to nice boundary
 nstack:
 ;
@@ -83,6 +161,7 @@ nstack:
 ;	and the individual stacks of each process and other resources you
 ;	need in your application (see other routines)
 
+;--------------------------------------------------------------------------
 ;
 ;	JCB	- Job Control Block
 ;

@@ -92,9 +92,7 @@
 ;
 ;	2023-02-06	PS	standardize return values for iotick, waitqueue
 ;				and suspend, jobs should not make use of internal
-;				data structure, the only exception is ioq_iostat
-;				can be used in interrupts, but potentially this
-;				should also disappear in the future
+;				data structure
 ;
 ;	2023-02-06	PS	link now destroys xl, xh. Except when called
 ;				by create xl, xh was not required to be saved.
@@ -104,68 +102,6 @@
 ;				saved on the stack and where not required to
 ;				be preserved, this also saves stack
 ;
-;--------------------------------------------------------------------------
-;
-;	
-;	- sigqueue and waitqueue start useing two parameters instead of
-;	  placing parameters into the control block perhaps we should 
-;	  extend this to at least suspend as well with the timeout
-;	  parameter
-;
-;	- we need to standardise return parameters for oscalls, we always
-;	  will return a 16-bit value in r25:r24
-;	  iotick 
-;		will always return zero to indicate a timeout
-;
-;	  suspend
-;		when called with zero timeout suspend will return zero
-;		when the event did not already occur, as the caller has
-;		to deliberately set the timeout to zero he knows that
-;		a return value does not mean timeout but that the event
-;		has not already occurred
-;
-;		when called with a positive timeout and the call times out
-;		iotick will kick in and return a zero value
-;
-;		when called with a positive timeout and the event occurs
-;		or already has occurred we know that resume has been called
-;		and assume that it has set an io status
-;
-;		r24	iostatus
-;		r25	success and resume flag
-;	  
-;
-;	  waitqueue
-;		when called with a zero timeout it will return immediately
-;		with the first record. In case there were no records in 
-;		the queue it will immediately return a zero value
-;
-;		when called and another job is already waiting we will
-;		return a 16-bit value of 0x0001
-;
-;		when called with a positive timeout and the call times out
-;		iotick will kick in and return a zero value
-;
-;		when called with a positive timeout and a record exists
-;		in the queue or has been placed into the queue before the
-;		timeout occurs it will return the record
-;
-;		Note: records need to reside in SRAM, EEROM or FLASH and
-;		never in the IO-Space. With other words a valid record
-;		address always has a non-zero value in the high-order
-;		byte of the address. Therefore the caller can just check
-;		r25 to see whether he got a record or not
-;
-;	To-Do-List
-;
-;	- currently it is assumed that the "link" sub-routine does not
-;	  change register, however in most cases there is no need to
-;	  keep the registers unchanged, so it should be the callers
-;	  duty to save registers xl, xh, yl, yh, zl, zh if required
-;	- iostat should only be set by resume and when calling resume
-;	  we shoud expect iostat to be in a register
-;
-
 ;--------------------------------------------------------------------------
 	.cseg
 ;
@@ -186,6 +122,7 @@
 	rjmp	PC-1			; 
 	ret				; Normal return
 .endmacro
+
 ;--------------------------------------------------------------------------
 ;
 ;	We use a pin-change interrupt with LEVEL 0 to call the OS routines.
@@ -202,9 +139,13 @@
 rtos_:
 	sbis	b_RTOS			; Is it an OSCALL software interrupt
 	rjmp	oscall_			; yes ->
+
+	ldi	r16, crash_spurious	; 
+	jmp	crash			; crashdump (at the moment simple crash)
+
 	reti				; should never happen
 	
-oscall_:
+oscall_:				; 
 	push	r8			; save minimal context
 	in	r8, CPU_SREG
 	sbi	b_RTOS			; important, between setting the pin and
@@ -212,70 +153,21 @@ oscall_:
 	push	zl			; have at least one additional cpu cycle!
 	push	yh
 	push	yl
-;
-;	Testoutput
-;
-#ifdef	tesout
-	cpi	zl, low(delay_)		; 
-	breq	oscall010_
-	push	xl
-	lds	yl, tesoutptr
-	ldi	yh, high(tesoutbuf)
-	st	Y+, zl			; Function call
-	lds	xl, curjob+0
-	st	Y+, xl			; Current Job
-	st	Y+, r20			; All Parameters
-	st	Y+, r21
-	st	Y+, r22
-	st	Y+, r23
-	st	Y+, r24
-	st	Y+, r25
-	sts	tesoutptr, yl
-	pop	xl
-oscall010_:
-#endif
-;
-;
-;
 	sbi	f_RTOS			; Acknowledge interrupt
-	ijmp	
+	ijmp				; Note: if b_RTOS has been cleared Z is valid
 ;
-;
-;
-suspend:
-	oscall	suspend_
+suspend:	oscall	suspend_
+acquire:	oscall	acquire_
+release:	oscall	release_
+block:		oscall	block_
+unblock:	oscall	unblock_
+delay:		oscall	delay_
+setpriority:	oscall	setpriority_
+waitqueue:	oscall	waitqueue_
+sigqueue:	oscall	sigqueue_
+create:		oscall	create_
+tesoutput:	oscall	tesoutput_
 
-acquire:
-	oscall	acquire_
-	
-release:
-	oscall	release_
-
-block:
-	oscall	block_
-
-unblock:
-	oscall	unblock_
-
-delay:
-	oscall	delay_
-
-setpriority:
-	oscall	setpriority_
-
-waitqueue:
-	oscall	waitqueue_
-
-sigqueue:
-	oscall	sigqueue_
-
-create:
-	oscall	create_
-
-tesoutput:
-	oscall	tesoutput_
-tesoutput_:
-	reti
 ;--------------------------------------------------------------------------
 ;
 ;	intsave	- interrupt save routine, this routine is intended for
@@ -324,8 +216,8 @@ intsave:
 ;	.byte	1	; pch
 ;	.byte	1	; pcl
 ;
-	ldi	yl, low(sysret)
-	ldi	yh, high(sysret)
+	ldi	yl, low(sysretout)
+	ldi	yh, high(sysretout)
 	push	yl
 	push	yh
 	ijmp			; Jump back to ISR, the ISR then only needs
@@ -478,6 +370,31 @@ intsave:
 ;
 ;	Exit system without context switch
 ;
+sysextout:
+	lds	zl, tesoutptr+0
+	lds	zh, tesoutptr+1
+	lds	yl, tesoutent+0
+	std	Z+0, yl
+	lds	yl, tesoutent+1
+	std	Z+1, yl
+	lds	yl, tesoutent+2
+	std	Z+2, yl
+	lds	yl, tesoutent+3
+	std	Z+3, yl
+	lds	yl, tesoutent+4
+	std	Z+4, yl
+	lds	yl, tesoutent+5
+	std	Z+5, yl
+	lds	yl, TCA0_SINGLE_CNT+0
+	lds	yh, TCA0_SINGLE_CNT+1
+	std	Z+6, yl
+	std	Z+7, yh
+	adiw	zh:zl, 8
+	andi	zh, high(tesoutlen-1)	; First we only use 0x7000..0x77FF
+	ori	zh, high(tesoutbuf)
+	sts	tesoutptr+0, zl
+	sts	tesoutptr+1, zh
+
 sysext:	pop	yl			; unwind minimal context
 	pop	yh
 	pop	zl
@@ -494,6 +411,8 @@ sysext:	pop	yl			; unwind minimal context
 	rtdbg	dbg_null, 0
 	rtdbg	dbg_suspend, 0
 	rtdbg	dbg_resume, 0
+	rtdbg	dbg_waitqueue, 0
+	rtdbg	dbg_sigqueue, 0
 	reti
 ;--------------------------------------------------------------------------
 ;
@@ -512,6 +431,31 @@ sysext:	pop	yl			; unwind minimal context
 ;
 ;	R8 contains the saved SREG value
 ;
+sysretout:
+	lds	zl, tesoutptr+0
+	lds	zh, tesoutptr+1
+	lds	yl, tesoutent+0
+	std	Z+0, yl
+	lds	yl, tesoutent+1
+	std	Z+1, yl
+	lds	yl, tesoutent+2
+	std	Z+2, yl
+	lds	yl, tesoutent+3
+	std	Z+3, yl
+	lds	yl, tesoutent+4
+	std	Z+4, yl
+	lds	yl, tesoutent+5
+	std	Z+5, yl
+	lds	yl, TCA0_SINGLE_CNT+0
+	lds	yh, TCA0_SINGLE_CNT+1
+	std	Z+6, yl
+	std	Z+7, yh
+	adiw	zh:zl, 8
+	andi	zh, high(tesoutlen-1)	; First we only use 0x7000..0x77FF
+	ori	zh, high(tesoutbuf)
+	sts	tesoutptr+0, zl
+	sts	tesoutptr+1, zh
+
 sysret:
 	rtdbg	dbg_sysret, 1
 	lds	zl, curjob+0		;;; Z = curjob
@@ -660,9 +604,6 @@ nulljob:
 ;
 ;	1 millisecond (depends on settings) timer interrupt service routine 
 ;
-;	You need to setup a timer to create a regular intterrupt and use
-;	this routine as the interrupt service routine.
-;
 tick:
 	rtdbg	dbg_tick, 1
 	push	r8			;;; 
@@ -695,7 +636,6 @@ tick130:
 	out	CPU_SREG, r8		;;; we always return from the timer interrupt
 	pop	r8
 	reti
-;
 tick100:
 	push	yh
 	push	yl
@@ -738,10 +678,6 @@ tick120:
 ;	the io-queue control block from the queue and put the job back
 ;	into the run queue.
 ;
-;	suspend and waitqueue are supposed to return a value to the
-;	caller. In case of iotick we will make sure to return a value
-;	of zero to inform the job that a time-out has occurred.
-;
 iotick:
 	ldi	zl, low(ioticks)
 	ldi	zh, high(ioticks)
@@ -752,14 +688,12 @@ iotick:
 	sbiw	zh:zl, 0
 	brne	iotick100
 	ret
-	
 iotick100:				; We have at least one block in the queue
 	rtdbg	dbg_iotick, 1
 	push	yh			; So save resgister we need
 	push	yl
 	push	xh
 	push	xl
-
 	ldi	yl, low(ioqueue)	; Prepare address of "previous"
 	ldi	yh, high(ioqueue)
 iotick110:
@@ -769,13 +703,11 @@ iotick110:
 	std	Z+ioq_timer+0, xl
 	std	Z+ioq_timer+1, xh
 	brpl	iotick120		; timer not expired
-;
-;	timer of io control block expired
-;
 	push	yh			; Save link head pointer Y
 	push	yl
 	ldd	xl, Z+ioq_link+0	; Unlink this block from chain
 	ldd	xh, Z+ioq_link+1
+	chkaddr	xh, xl, chk_iotick
 	std	Y+ioq_link+0, xl	; i.e. let previous point to next or null
 	std	Y+ioq_link+1, xh	
 	ldd	xl, Z+ioq_flags		; update io conrol block flags
@@ -815,7 +747,6 @@ iotick120:
 	pop	yh
 	rtdbg	dbg_iotick, 0
 	ret
-
 ;--------------------------------------------------------------------------
 ;
 ;	link a job into a list, jobs are queued with descending priority, at
@@ -883,6 +814,8 @@ link110:			; 110$:
 ;	or negative then it will timeout relatively fast (within seconds)
 ;
 suspend_:
+	tesoute	chk_suspend, zl, zh, r24, r25
+	chkaddr	r25, r24, chk_suspend
 	rtdbg	dbg_suspend, 1
 	movw	zh:zl, r25:r24
 	ldd	yl, Z+ioq_flags
@@ -898,6 +831,7 @@ suspend_:
 	rtdbg	dbg_suspendflag, 1	; *** debugging ***
 	lds	yl, ioqueue+0		; get front most queue entry or ZERO if none
 	lds	yh, ioqueue+1		; 
+	chkaddr	yh, yl, chk_suspend+1
 	std	Z+ioq_link+0, yl	; let new record point to this entry or ZERO
 	std	Z+ioq_link+1, yh
 	sts	ioqueue+0, zl		; make new record to the front most queue entry
@@ -915,30 +849,34 @@ suspend_:
 	std	Y+jcb_flags, zl
 	std	Y+jcb_joblist+0, r24	; set the jobs suspend queue address
 	std	Y+jcb_joblist+1, r25
-	rjmp	sysret			; reschedule
+	rjmp	sysretout		; reschedule
 
 suspend010:
 	clr	r24
 	clr	r25			; 
+	tesflag	0x04, yl
 	rjmp	suspend030
 
 suspend020:
 	mov	r25, yl			; 
 	sbr	r25, ioq__iodone_bm	; Bit Mark to make sure r25 is not 0
 	ldd	r24, Z+ioq_iostat	;
+	tesflag	0x01, yl
 
 suspend030:
 	cbr	yl, ioq__resume_bm	; Acknowledge event
 	rtdbg	dbg_resumeflag, 0	; *** debugging ***
 	std	Z+ioq_flags, yl
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_suspend, 0		; *** debugging ***
-	reti
+	tesflag	0x02, yl
+	rjmp	sysextout		; Exit and create test output
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_suspend, 0		; *** debugging ***
+;	reti
 
 
 ;--------------------------------------------------------------------------
@@ -955,34 +893,19 @@ suspend030:
 ;	be updated accordingly
 ;
 resume:
+	tesoute	chk_resume, yl, yh, zl, zh
+	chkaddr	zh, zl, chk_resume
 	rtdbg	dbg_resume, 1		; *** debugging ***
 	std	Z+ioq_iostat, yl	; Save io status in control block
-	push	yl
 	push	yh
-#ifdef	tesout
-	push	xl
-	mov	xl, yl			; io status
-	lds	yl, tesoutptr
-	ldi	yh, high(tesoutbuf)
-	std	Y+7, zh
-	std	Y+6, zl
-	std	Y+5, xl
-	ldd	xl, Z+ioq_flags
-	std	Y+4, xl
-	ldi	xl, low(resume)
-	std	Y+0, xl
-	lds	xl, curjob+0
-	std	Y+1, xl			; Current Job
-	subi	yl, -8
-	sts	tesoutptr, yl
-	pop	xl
-#endif
+	push	yl
 	ldd	yl, Z+ioq_flags
 	sbrc	yl, ioq__suspend_bp
 	rjmp	resume010		; A job is suspended
 	sbr	yl, ioq__resume_bm	; Signal event already occurred
-	rtdbg	dbg_resumeflag, 1		; *** debugging ***
+	rtdbg	dbg_resumeflag, 1	; *** debugging ***
 	std	Z+ioq_flags, yl		;
+	tesflag	0x01, yl
 	pop	yl
 	pop	yh
 	ret				; done
@@ -1001,19 +924,19 @@ resume020:
 	breq	resume040		; Found it
 	movw	yh:yl, xh:xl
 	rjmp	resume020
-	
-resume030:				; attempt to resume a non-suspended io
-	pop	xl
-	pop	xh
+resume030:				; attempt to resume a non-suspended ioq
+	pop	xl			; we should actually call the crash
+	pop	xh			; handler
+	tesflag	0x02, yl
 	pop	yl
 	pop	yh
 	ret				; Nothing to resume
-	
 resume040:
 	clr	xl
 	std	Z+ioq_flags, xl		; clear all flag
 	ldd	xl, Z+ioq_link+0	; Remove this io-queue control block
 	ldd	xh, Z+ioq_link+1	; from queue, let previous point to next
+	chkaddr	xh, xl, chk_resume+1
 	std	Y+ioq_link+0, xl	; which might be zero in case of last
 	std	Y+ioq_link+1, xh
 	clr	xl
@@ -1021,6 +944,8 @@ resume040:
 	std	Z+ioq_link+1, xl
 	ldd	yl, Z+ioq_queue+0	; Get job control block
 	ldd	yh, Z+ioq_queue+1
+	sbiw	yh:yl, 0
+	breq	resume050
 	ldd	xl, Z+ioq_iostat	; Setup return value for job
 	ldi	xh, ioq__iodone_bm	;
 	ldd	zl, Y+jcb_stack+0	; Get stack pointer of job to Z register
@@ -1043,6 +968,15 @@ resume040:
 	pop	yh
 	rtdbg	dbg_resume, 0		; *** debugging ***
 	ret
+resume050:
+	pop	xl
+	pop	xh
+	tesflag	0x04, yl
+	pop	yl
+	pop	yh
+	rtdbg	dbg_resume, 0		; *** debugging ***
+	ret
+
 ;--------------------------------------------------------------------------
 ;
 ;	Acquires a resource. A resource is a just a word in RAM initialised
@@ -1061,6 +995,7 @@ resume040:
 ;
 ;
 acquire_:
+	tesoute	chk_acquire, zl, zh, r24, r25
 	rtdbg	dbg_acquire, 1
 	movw	zh:zl, r25:r24		;
 	ldd	yl, Z+0			; r1==Z
@@ -1071,14 +1006,15 @@ acquire_:
 	ldi	yh, high(1)
 	std	Z+0, yl
 	std	Z+1, yh			; mov	#1, (r1)
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_acquire, 0
-	reti
+	rjmp	sysextout
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_acquire, 0
+;	reti
 
 acquire100:				; 100$:
 	push	xh
@@ -1106,7 +1042,7 @@ acquire110:			; 110$:
 acquire120:			; 120$
 	pop	xl
 	pop	xh
-	rjmp	sysret			; 
+	rjmp	sysretout			; 
 ;--------------------------------------------------------------------------
 ;
 ;	Release does, as the name says, release a resource, only the current
@@ -1119,7 +1055,8 @@ acquire120:			; 120$
 ;	r24:r25	-> pointer to lock word
 ;
 ;
-release_:				; 
+release_:	
+	tesoute	chk_release, zl, zh, r24, r25
 	rtdbg	dbg_release, 1
 	movw	zh:zl, r25:r24		; r0==Y
 	ldd	yl, Z+0			; r1==Z
@@ -1128,14 +1065,15 @@ release_:				;
 	brne	release100		; bne	100$
 	std	Z+0, yl			; no other job acquired the lock so
 	std	Z+1, yh			; clr	(r1)
-	pop	yl			; we just need to set it to available == 0
-	pop	yh
-	pop	zl
-	pop	zh
-	rtdbg	dbg_release, 0
-	out	CPU_SREG, r8
-	pop	r8
-	reti
+	rjmp	sysextout
+;	pop	yl			; we just need to set it to available == 0
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	rtdbg	dbg_release, 0
+;	out	CPU_SREG, r8
+;	pop	r8
+;	reti
 
 release100:				; 100$:	
 	push	xh
@@ -1160,7 +1098,7 @@ release110:				; 110$:
 	rcall	link			; jsr	pc, link
 	pop	xl
 	pop	xh
-	rjmp	sysret			; 
+	rjmp	sysretout			; 
 ;--------------------------------------------------------------------------
 ;
 ;	block a job until an event occurs. If the event already occured in the 
@@ -1172,6 +1110,7 @@ release110:				; 110$:
 ;
 
 block_:
+	tesoute	chk_block, zl, zh, r24, r25
 	rtdbg	dbg_block, 1
 	movw	zh:zl, r25:r24
 	ldd	yl, Z+0
@@ -1180,14 +1119,16 @@ block_:
 	brne	block010		;;; no block myself
 	std	Z+0, yl			;;; acknowledge event
 	std	Z+1, yh			;;; indicate it is now idle
-	pop	yl			;;; quick exit
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_block, 0
-	reti
+	tesflag	0x01, yl
+	rjmp	sysextout
+;	pop	yl			;;; quick exit
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_block, 0
+;	reti
 
 block010:
 	push	xh
@@ -1207,7 +1148,7 @@ block010:
 	rtdbg	dbg_block, 0
 	pop	xl
 	pop	xh
-	rjmp	sysret
+	rjmp	sysretout
 
 ;--------------------------------------------------------------------------
 ;	
@@ -1240,6 +1181,7 @@ unblock_:
 ;	Z 	-> pointer to lock word
 ;
 unblocki:				;;; Entry for interrupt service routines
+	tesoute	chk_unblock, yl, yh, zl, zh
 	rtdbg	dbg_unblock, 1
 	ldd	yl, Z+0
 	ldd	yh, Z+1			;;; Get block status
@@ -1252,21 +1194,23 @@ unblocki:				;;; Entry for interrupt service routines
 	out	CPU_SREG, r8
 	pop	r8
 	rtdbg	dbg_unblock, 0
-	reti
+	reti				;;; Exit without test output
 unblock040:
 	adiw	yh:yl, 1		;;; Restore block status
 	brne	unblock060		;;; there is a job waiting
 	adiw	yh:yl, 1		;;; 0->1
 	std	Z+0, yl			;;; flag a pending unblock/event
 	std	Z+1, yh
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_unblock, 0
-	reti
+	tesflag	0x01, yl
+	rjmp	sysextout
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_unblock, 0
+;	reti
 unblock060:
 	push	xh
 	push	xl
@@ -1283,13 +1227,14 @@ unblock060:
 	rtdbg	dbg_unblock, 0
 	pop	xl
 	pop	xh
-	rjmp	sysret
+	rjmp	sysretout
 ;--------------------------------------------------------------------------
 ;
 ;	r25:r24 -->	queue control block
 ;	r23:r22 -->	timeout
 ;
 waitqueue_:
+	tesoute	chk_waitqueue, zl, zh, r24, r25
 	rtdbg	dbg_waitqueue, 1	; *** debugging ***
 	movw	zh:zl, r25:r24		; Z=queue control block
 	ldd	yl, Z+ioq_flags
@@ -1308,28 +1253,30 @@ waitqueue_:
 	std	Z+ioq_flags, r24
 waitqueue010:
 	movw	r25:r24, yh:yl		; move removed record to return value
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-	reti				; and just return
+	rjmp	sysextout
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_waitqueue, 0	; *** debugging ***
+;	reti				; and just return
 
 waitqueue100:				; no records queued
 	sbrs	yl, ioq__job_bp		; is there already a job waiting?
 	rjmp	waitqueue110		; nope
 	ldi	r24, low(1)		; another job is already waiting so return busy
 	ldi	r25, high(1)		; r25=high(1) is in fact zero!!
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-	reti				; and just return
+	rjmp	sysextout
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_waitqueue, 0	; *** debugging ***
+;	reti				; and just return
 
 waitqueue110:				; no record and no job is waiting
 	std	Z+ioq_timer+0, r22	; set timeout value
@@ -1338,14 +1285,15 @@ waitqueue110:				; no record and no job is waiting
 	brne	waitqueue120
 	clr	r24			; zero timeout and no record
 	clr	r25
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-	reti				; and just return
+	rjmp	sysextout
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_waitqueue, 0	; *** debugging ***
+;	reti				; and just return
 	
 waitqueue120:
 	sbr	yl, ioq__job_bm		; set job wait flag
@@ -1368,13 +1316,14 @@ waitqueue120:
 	sts	runjob+0, zl		; set this or ZEORO s first job in queue
 	sts	runjob+1, zh
 	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-	rjmp	sysret			; reschedule
+	rjmp	sysretout		; reschedule
 ;--------------------------------------------------------------------------
 ;
 ;	r25:r24 -->	queue control block
 ;	r23:r22 -->	record
 ;
 sigqueue_:
+	tesoute	chk_sigqueue, zl, zh, r24, r25
 	rtdbg	dbg_sigqueue, 1
 	movw	zh:zl, r25:r24		; Queue Control Block
 	ldd	yl, Z+ioq_flags
@@ -1398,7 +1347,7 @@ sigqueue020:
 sigqueue030:				; this must not happen as we cannot 
 	pop	xl			; signal a record to a control block
 	pop	xh			; with a job waiting but not in the ioqueue
-	rjmp	sysret
+	rjmp	sysretout
 
 sigqueue040:				; we found our control block note X=Z=current
 	clr	xl			; as we forward the record to the job there is
@@ -1430,7 +1379,7 @@ sigqueue040:				; we found our control block note X=Z=current
 	rtdbg	dbg_sigqueue, 0
 	pop	xl			; no longer needed
 	pop	xh
-	rjmp	sysret			; reschedule
+	rjmp	sysretout		; reschedule
 
 sigqueue100:				; There is no job waiting, we make sure the
 	sbr	yl, ioq__record_bm	; record flag is set and add the record to 
@@ -1450,14 +1399,15 @@ sigqueue120:
 	clr	yl
 	std	Z+0, yl			; Make sure new record is marked as last
 	std	Z+1, yl
-	pop	yl
-	pop	yh
-	pop	zl
-	pop	zh
-	out	CPU_SREG, r8
-	pop	r8
-	rtdbg	dbg_sigqueue, 0
-	reti
+	rjmp	sysextout
+;	pop	yl
+;	pop	yh
+;	pop	zl
+;	pop	zh
+;	out	CPU_SREG, r8
+;	pop	r8
+;	rtdbg	dbg_sigqueue, 0
+;	reti
 ;--------------------------------------------------------------------------
 ;
 ;	puts the current job into the hibernate job queue where it will wait
@@ -1488,7 +1438,7 @@ delay_:
 	std	Y+1, zh
 	sts	hibjob+0, yl
 	sts	hibjob+1, yh		;;; Hibernate the job
-	rjmp	sysret
+	rjmp	sysretout
 ;
 ;	r24	= priority
 ;
@@ -1513,7 +1463,24 @@ setpriority_:
 	rcall	link			;;; Link into runjob according priority
 	pop	xl
 	pop	xh			;;; Restore work register
-	rjmp	sysret			;;; 
+	rjmp	sysretout		;;; 
+;--------------------------------------------------------------------------
+;
+;	Testoutput 
+;
+tesoutput_:
+	mov	yl, r20			;;;
+	andi	yl, 0x0F		;;; ID is only 4 bits for the moment
+	ori	yl, chk_tesout
+	sts	tesoutent+0, yl
+	lds	yl, curjob
+	sts	tesoutent+1, yl
+	sts	tesoutent+2, r22
+	sts	tesoutent+3, r23
+	sts	tesoutent+4, r24	;;; 
+	sts	tesoutent+5, r25	;;;
+	rjmp	sysextout
+
 ;--------------------------------------------------------------------------
 ;
 ;	creates a job. you need a job control block setup with the values 
