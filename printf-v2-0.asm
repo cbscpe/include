@@ -51,7 +51,7 @@ l	32-bit
 ;	usage
 ;
 ;	call	mprint
-;	.dw	<msgptr>
+;	.dw	<msgptr>, <dataptr>
 ;
 ;	It makes use of the feature of the AVR128 mcu family that can map a 32kbyte
 ;	range of the flash to the normal data address space. 
@@ -65,41 +65,53 @@ printf:
 	in	yh, SPH			; get stack pointer
 	in	yl, CPU_SPL
 	in	yh, CPU_SPH
+	push	xh			; Save additional registers
+	push	xl
+	push	r25
+	push	r24
+	push	r23
+	push	r22
 	ldd	zl, Y+6			; get return address
 	ldd	zh, Y+5
 ;-	sts	0x5000, yl	
 ;-	sts	0x5001, yh
 ;-	sts	0x5002, zl
 ;-	sts	0x5003, zh
-	adiw	zh:zl, 1		; increment return address (skip msg pointer)
+	adiw	zh:zl, 2		; increment return address (skip msg pointer)
 	std	Y+6, zl			; update return address
 	std	Y+5, zh
 ;-	sts	0x5004, zl
 ;-	sts	0x5005, zh
-	sbiw	zh:zl, 1		; go back to msg pointer
+	sbiw	zh:zl, 2		; go back to msg pointer
 	lsl	zl			; Make byte index
 	rol	zh
 	lpm	yl, Z+			; get message pointer
 	lpm	yh, Z+
+	lpm	xl, Z+			; get data pointer
+	lpm	xh, Z+
 ;-	sts	0x5006, yl
 ;-	sts	0x5007, yh
 ;	ldi	r24, CR
 ;	call	serout
 ;	ldi	r24, LF
 ;	call	serout
-	push	r24
-mprint010:	
+print010:	
 	ld	r24, Y+
 	tst	r24
 	breq	mprint020
 	call	serout
 	rjmp	mprint010
 mprint020:
-	pop	r24
 ;	ldi	r24, CR
 ;	call	serout
 ;	ldi	r24, LF
 ;	call	serout
+	pop	r22
+	pop	r23
+	pop	r24
+	pop	r25
+	pop	xl
+	pop	xh
 	pop	zh
 	pop	zl
 	pop	yh
