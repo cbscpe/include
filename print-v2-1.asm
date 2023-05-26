@@ -400,37 +400,35 @@ rad50tab:
 	
 ;--------------------------------------------------------------------------
 ;
+;	Convert uint8_t to decimal without leading 0/space
 ;
 printxf0sub:
 	ld	r20, Y+
-	cpi	r20, 200
-	brlo	printxf0sub010
-	ldi	r24, '2'		; 200..255
-	call	serout
-	subi	r20, 200
-	rjmp	printxf0sub030
-printxf0sub010:
-	cpi	r20, 100		; 100..199
+	cpi	r20, 10
+	brlo	printxf0sub040
+	cpi	r20, 100
 	brlo	printxf0sub020
 	ldi	r24, '1'
-	call	serout
 	subi	r20, 100
-	rjmp	printxf0sub030
+	cpi	r20, 100
+	brlo	printxf0sub010
+	ldi	r24, '2'
+	subi	r20, 100
+printxf0sub010:
+	call	serout
 printxf0sub020:
-	cpi	r20, 10
-	brlo	printxf0sub050		; Need only single digit
-printxf0sub030:				; Need two digits
 	ldi	r24, '0'
-printxf0sub035:
 	subi	r20, 10
-	brmi	printxf0sub040
+printxf0sub030:
 	inc	r24
-	rjmp	printxf0sub035
+	subi	r20, 10
+	brpl	printxf0sub030
+	subi	r20, -10
+	call	serout
 printxf0sub040:
-	subi	r20, -10		; Adjust
-	call	serout
-printxf0sub050:
 	mov	r24, r20
-	subi	r24, -'0'
+	ori	r24, '0'
 	call	serout
-	ret
+	ret	
+	
+
