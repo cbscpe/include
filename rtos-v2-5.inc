@@ -39,6 +39,7 @@
 #define	chk_resume	0xB0
 #define chk_iotick	0xC0
 #define	chk_tesout	0xD0
+#define chk_invalid	0xF0
 
 #define crash_nojob	0xFE
 #define	crash_spurious	0xFF
@@ -169,14 +170,17 @@ record		jcb, stack, 2
 record		jcb, joblist, 2
 record		jcb, priority, 1
 record		jcb, flags, 1
-	.equ	jcb__hibernate_bp = 0
+;
+;
+;
+	.equ	jcb__hibernate_bp = 0		; Task is in hibjob queue [delay()]
 	.equ	jcb__hibernate_bm = 0x01
-	.equ	jcb__suspend_bp	= 1	
+	.equ	jcb__suspend_bp	= 1		; Task is suspended
 	.equ	jcb__suspend_bm	= 0x02
-	.equ	jcb__wait_bp = 2
+	.equ	jcb__wait_bp = 2		; Task is waitqueued
 	.equ	jcb__wait_bm = 0x04
-record		jcb, iostat, 2
-record		jcb, jobname, 2
+record		jcb, iostat, 2			; 
+record		jcb, jobname, 2			; 
 recordend	jcb, size
 ;
 ;	IOQ	- IO-Queue Control Block
@@ -207,16 +211,14 @@ record		ioq, flags, 1
 ;	Flags in the ioq parameter block 
 ;
 
-	.equ	ioq__resume_bp	= 2
-	.equ	ioq__resume_bm	= 0x04
-	.equ	ioq__suspend_bp	= 1
-	.equ	ioq__suspend_bm	= 0x02
-	.equ	ioq__iodone_bp	= 0
+	.equ	ioq__iodone_bp	= 0		; IO finished
 	.equ	ioq__iodone_bm	= 0x01
-	
-	
-	.equ	ioq__record_bp	= 3
+	.equ	ioq__resume_bp	= 2		; Event already occurred
+	.equ	ioq__resume_bm	= 0x04
+	.equ	ioq__suspend_bp	= 1		; Job is suspended
+	.equ	ioq__suspend_bm	= 0x02
+	.equ	ioq__record_bp	= 3		; Waitqueue has records queued
 	.equ	ioq__record_bm	= 0x08
-	.equ	ioq__job_bp	= 4
+	.equ	ioq__job_bp	= 4		; Waitqueue has job waiting
 	.equ	ioq__job_bm	= 0x10
 recordend	ioq, size

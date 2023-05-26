@@ -390,6 +390,8 @@ tesoutput_:
 ;	Exit system without context switch
 ;
 sysextout:
+	sbic	GPR_GPR0, tesout_bp
+	rjmp	sysextout010
 	lds	zl, tesoutptr+0
 	lds	zh, tesoutptr+1
 	lds	yl, tesoutent+0
@@ -413,6 +415,9 @@ sysextout:
 	ori	zh, high(tesoutbuf)
 	sts	tesoutptr+0, zl
 	sts	tesoutptr+1, zh
+	ldi	zl, chk_invalid		; Invalidate the saved tesoutent
+	sts	tesoutent+0, zl
+sysextout010:
 
 sysext:	pop	yl			; unwind minimal context
 	pop	yh
@@ -420,14 +425,14 @@ sysext:	pop	yl			; unwind minimal context
 	pop	zh
 	out	CPU_SREG, r8
 	pop	r8
-	rtdbg	dbg_sysrun, 0
+	rtdbg	dbg_sysrun, 0		; Switch off debugging
 	rtdbg	dbg_sysret, 0
 	rtdbg	dbg_tick, 0
 	rtdbg	dbg_block, 0
 	rtdbg	dbg_unblock, 0
 	rtdbg	dbg_release, 0
 	rtdbg	dbg_acquire, 0
-	rtdbg	dbg_null, 0
+	rtdbg	dbg_sysnull, 0
 	rtdbg	dbg_suspend, 0
 	rtdbg	dbg_resume, 0
 	rtdbg	dbg_waitqueue, 0
@@ -451,6 +456,8 @@ sysext:	pop	yl			; unwind minimal context
 ;	R8 contains the saved SREG value
 ;
 sysretout:
+	sbic	GPR_GPR0, tesout_bp
+	rjmp	sysretout010
 	lds	zl, tesoutptr+0
 	lds	zh, tesoutptr+1
 	lds	yl, tesoutent+0
@@ -474,6 +481,9 @@ sysretout:
 	ori	zh, high(tesoutbuf)
 	sts	tesoutptr+0, zl
 	sts	tesoutptr+1, zh
+	ldi	zl, chk_invalid		; Invalidate the saved tesoutent
+	sts	tesoutent+0, zl
+sysretout010:
 ;
 ;	You need to make sure that sysret is never used with both curjob and
 ;	runjob empty. It is the task of the various functions to use the correct
@@ -570,14 +580,18 @@ sysrun:
 	pop	zh			;;; 
 	out	CPU_SREG, r8
 	pop	r8
-	rtdbg	dbg_sysrun, 0
+	rtdbg	dbg_sysrun, 0		; Switch off debugging
 	rtdbg	dbg_sysret, 0
 	rtdbg	dbg_tick, 0
 	rtdbg	dbg_block, 0
 	rtdbg	dbg_unblock, 0
-	rtdbg	dbg_sysnul, 0
-	rtdbg	dbg_acquire, 0
 	rtdbg	dbg_release, 0
+	rtdbg	dbg_acquire, 0
+	rtdbg	dbg_sysnull, 0
+	rtdbg	dbg_suspend, 0
+	rtdbg	dbg_resume, 0
+	rtdbg	dbg_waitqueue, 0
+	rtdbg	dbg_sigqueue, 0
 	reti
 
 ;--------------------------------------------------------------------------
@@ -836,7 +850,7 @@ suspend_:
 	std	Z+ioq_queue+1, yh	; 
 	ldd	zl, Y+ioq_link+0	; get potential next job or ZERO if none
 	ldd	zh, Y+ioq_link+1
-	sts	runjob+0, zl		; set this or ZEORO as first job in queue
+	sts	runjob+0, zl		; set this or ZERO as first job in queue
 	sts	runjob+1, zh
 	ldd	zl, Y+jcb_flags		; set the suspend flag in our jcb
 	sbr	zl, jcb__suspend_bm
@@ -863,16 +877,6 @@ suspend030:
 	std	Z+ioq_flags, yl
 	tesflag	0x02, yl
 	rjmp	sysextout		; Exit and create test output
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_suspend, 0		; *** debugging ***
-;	reti
-
-
 ;--------------------------------------------------------------------------
 ;
 ;	Z --->		io-queue control block
@@ -1002,15 +1006,6 @@ acquire_:
 	std	Z+0, yl
 	std	Z+1, yh			; mov	#1, (r1)
 	rjmp	sysextout
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_acquire, 0
-;	reti
-
 acquire100:				; 100$:
 	push	xh
 	push	xl
@@ -1061,15 +1056,6 @@ release_:
 	std	Z+0, yl			; no other job acquired the lock so
 	std	Z+1, yh			; clr	(r1)
 	rjmp	sysextout
-;	pop	yl			; we just need to set it to available == 0
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	rtdbg	dbg_release, 0
-;	out	CPU_SREG, r8
-;	pop	r8
-;	reti
-
 release100:				; 100$:	
 	push	xh
 	push	xl
@@ -1116,15 +1102,6 @@ block_:
 	std	Z+1, yh			;;; indicate it is now idle
 	tesflag	0x01, yl
 	rjmp	sysextout
-;	pop	yl			;;; quick exit
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_block, 0
-;	reti
-
 block010:
 	push	xh
 	push	xl
@@ -1198,14 +1175,6 @@ unblock040:
 	std	Z+1, yh
 	tesflag	0x01, yl
 	rjmp	sysextout
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_unblock, 0
-;	reti
 unblock060:
 	push	xh
 	push	xl
@@ -1249,14 +1218,6 @@ waitqueue_:
 waitqueue010:
 	movw	r25:r24, yh:yl		; move removed record to return value
 	rjmp	sysextout
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-;	reti				; and just return
 
 waitqueue100:				; no records queued
 	sbrs	yl, ioq__job_bp		; is there already a job waiting?
@@ -1264,14 +1225,6 @@ waitqueue100:				; no records queued
 	ldi	r24, low(1)		; another job is already waiting so return busy
 	ldi	r25, high(1)		; r25=high(1) is in fact zero!!
 	rjmp	sysextout
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-;	reti				; and just return
 
 waitqueue110:				; no record and no job is waiting
 	std	Z+ioq_timer+0, r22	; set timeout value
@@ -1281,14 +1234,6 @@ waitqueue110:				; no record and no job is waiting
 	clr	r24			; zero timeout and no record
 	clr	r25
 	rjmp	sysextout
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_waitqueue, 0	; *** debugging ***
-;	reti				; and just return
 	
 waitqueue120:
 	sbr	yl, ioq__job_bm		; set job wait flag
@@ -1308,7 +1253,7 @@ waitqueue120:
 	std	Y+jcb_flags, zl
 	ldd	zl, Y+0			; get potential next job or ZERO if none
 	ldd	zh, Y+1
-	sts	runjob+0, zl		; set this or ZEORO s first job in queue
+	sts	runjob+0, zl		; set this or ZERO s first job in queue
 	sts	runjob+1, zh
 	rtdbg	dbg_waitqueue, 0	; *** debugging ***
 	rjmp	sysretout		; reschedule
@@ -1395,14 +1340,6 @@ sigqueue120:
 	std	Z+0, yl			; Make sure new record is marked as last
 	std	Z+1, yl
 	rjmp	sysextout
-;	pop	yl
-;	pop	yh
-;	pop	zl
-;	pop	zh
-;	out	CPU_SREG, r8
-;	pop	r8
-;	rtdbg	dbg_sigqueue, 0
-;	reti
 ;--------------------------------------------------------------------------
 ;
 ;	puts the current job into the hibernate job queue where it will wait
@@ -1433,12 +1370,17 @@ delay_:
 	std	Y+1, zh
 	sts	hibjob+0, yl
 	sts	hibjob+1, yh		;;; Hibernate the job
-	rjmp	sysretout
+	rjmp	sysret
+;--------------------------------------------------------------------------
+;
+;	Change the priority of the job, remove the job from the runjob
+;	queue and then insert it according to new priority and reschedule.
 ;
 ;	r24	= priority
 ;
-
 setpriority_:
+	clr	yl
+	tesoute	chk_setpriority, r24, yl, yl, yl
 	push	xh
 	push	xl
 	lds	yl, runjob+0
@@ -1564,15 +1506,6 @@ create_:
 	st	-Y, r2			;
 	st	-Y, xh
 	st	-Y, xl
-;
-;	Old and obsolete handling of place for r25:r24
-;
-;	st	-Y, r25			; replaced by value for ABI parameter of job()
-;	st	-Y, r24
-;	ldd	r0, Z+0			; Get the "parameter" for the job			
-;	ldd	r1, Z+1
-;	st	-Y, r1			; This sets jobs register r25:r24 that
-;	st	-Y, r0			; correspond to the first parameter
 ;
 ;	New way of passing initial parameter to the created job
 ;
