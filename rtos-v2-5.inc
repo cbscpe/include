@@ -88,18 +88,16 @@ c020:
 ;
 .macro	tesoute
 #ifdef	tesout
-	sts	tesoutent+4, @1	; Save Registers in Testoutput
-	sts	tesoutent+5, @2
-
-	ldi	@1, @0		; Set the ID in Testoutput
-	sts	tesoutent+0, @1
-	lds	@1, curjob	; Current Job (not always true e.g. in interrupts)
-	sts	tesoutent+1, @1
-
-	sts	tesoutent+2, @3	; Paramter
-	sts	tesoutent+3, @4
-	lds	@1, tesoutent+4	; Restore Registers
-	lds	@2, tesoutent+5
+	push	r16
+	ldi	r16, @0
+	sts	tesoutent+0, r16
+	lds	r16, curjob+0
+	sts	tesoutent+1, r16
+	sts	tesoutent+2, @1
+	sts	tesoutent+3, @2
+	sts	tesoutent+4, @3
+	sts	tesoutent+5, @4
+	pop	r16
 #endif
 .endm
 
@@ -143,7 +141,7 @@ hibjob:		.byte	2		; Initialise with 0
 ioqueue:	.byte	2		; Initialise with 0
 iotime:		.byte	2		; Initialise with 0
 tesoutptr:	.byte	2		; Test Output Pointer
-tesimpure:	.byte	4
+cpuload:	.byte	4
 tesoutent:	.byte	8		
 intlevel:	.byte	1
 nguard:		.byte	1		; Null Job Stack Guard Byte

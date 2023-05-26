@@ -368,6 +368,25 @@ intsave:
 ;
 ;--------------------------------------------------------------------------
 ;
+;	Testoutput 
+;
+;	r25:r24		saved to offset 2
+;	r23:r22		saved to offset 3
+;	r20		bits 0..3 are used as an ID 
+;
+tesoutput_:
+	mov	yl, r20			;;;
+	andi	yl, 0x0F		;;; ID is only 4 bits for the moment
+	ori	yl, chk_tesout
+	sts	tesoutent+0, yl
+	lds	yl, curjob
+	sts	tesoutent+1, yl
+	sts	tesoutent+2, r24
+	sts	tesoutent+3, r25
+	sts	tesoutent+4, r23	;;; 
+	sts	tesoutent+5, r24	;;;
+;--------------------------------------------------------------------------
+;
 ;	Exit system without context switch
 ;
 sysextout:
@@ -455,7 +474,11 @@ sysretout:
 	ori	zh, high(tesoutbuf)
 	sts	tesoutptr+0, zl
 	sts	tesoutptr+1, zh
-
+;
+;	You need to make sure that sysret is never used with both curjob and
+;	runjob empty. It is the task of the various functions to use the correct
+;	return from the kernel, i.e. sysext or sysret
+;
 sysret:
 	rtdbg	dbg_sysret, 1
 	lds	zl, curjob+0		;;; Z = curjob
@@ -505,10 +528,10 @@ sysret:
 ;
 sysrun:	
 	rtdbg	dbg_sysrun, 1
-	sbiw	yh:yl, 0		;;; Test runjob
-	breq	sysnul			;;; No next job to run
 	sts	curjob+0, yl
 	sts	curjob+1, yh		;;; Set next job as current job
+	sbiw	yh:yl, 0		;;; Test next job
+	breq	sysnul			;;; No next job to run
 	ldd	r0, Y+jcb_stack+0	;;;
 	ldd	r1, Y+jcb_stack+1
 	out	CPU_SPL, r0
@@ -570,9 +593,6 @@ sysnul:
 	rtdbg	dbg_acquire, 0
 	rtdbg	dbg_release, 0
 	rtdbg	dbg_suspend, 0
-	clr	zl
-	sts	curjob+0, zl		;;; no current user job
-	sts	curjob+1, zl
 	ldi	zl, low(nstack-1)	;;; point after the null job stack as the stack
 	ldi	zh, high(nstack-1)	;;; pointer uses post decrement and pre increment
 	out	CPU_SPL, zl
@@ -586,128 +606,60 @@ sysnul:
 ;	The famous NULL job
 ;
 nulljob:
-;	cli
-;	rtdbg	dbg_sysnul, 1
-;	.ifdef SLPCTRL_CTRLA
-;	ldi	r16, SLPCTRL_SMODE_IDLE_gc+SLPCTRL_SEN_bm
-;	sts	SLPCTRL_CTRLA, r16
-;	.endif
-;	.ifdef SMCR
-;	ldi	r16, (1<<SE)
-;	out	SMCR, r16
-;	.endif
-;	sei
-;	sleep
-;	rtdbg	dbg_sysnul, 1
+
 	rjmp	nulljob			; No job scheduled, so just loop
 ;--------------------------------------------------------------------------
 ;
 ;	1 millisecond (depends on settings) timer interrupt service routine 
 ;
+;	We now treat the ticks and io time-out in one combined routine. In
+;	addition we use the T-flag to keep track if either has modified the
+;	runjob queue and use it distinguish whether we just return to the
+;	interrupted task (T cleared) as no changes were made the the runjob
+;	queue or whether we need to use sysext.
+;
 tick:
 	rtdbg	dbg_tick, 1
-	push	r8			;;; 
-	in	r8, CPU_SREG		;;;
+	push	r8			;;; Save Minimal Context
+	in	r8, CPU_SREG		;;; 
 	push	zh			;;;
-	push	zl			;;; Interrupt Save
+	push	zl			;;;
+	push	yh			;;;
+	push	yl			;;; Interrupt Save
+	push	xh			;;; Save more registers
+	push	xl			;;;
+	clt				;;; run queue has not been altered
+	
 	ack_timer_interrupt
 	lds	zl, iotime+0
 	lds	zh, iotime+1
 	sbiw	zh:zl, 1
 	sts	iotime+0, zl
 	sts	iotime+1, zh
-	brpl	tick130
-	rcall	iotick
-	lds	zl, hibjob+0
-	lds	zh, hibjob+1		;;; get job to look at
-	sbiw	zh:zl, 0		;;; subtract 0 to test for 0
-	brne	tick100			;;; found one
-	push	yh			;;; Save standard registers
-	push	yl
-	rjmp	sysret			;;; Never take a quick exit after iotick
-tick130:
-	lds	zl, hibjob+0
-	lds	zh, hibjob+1		;;; get job to look at
-	sbiw	zh:zl, 0		;;; subtract 0 to test for 0
-	brne	tick100			;;; found one
-	pop	zl			;;; else do a quick exit
-	pop	zh
-	rtdbg	dbg_tick, 0
-	out	CPU_SREG, r8		;;; we always return from the timer interrupt
-	pop	r8
-	reti
-tick100:
-	push	yh
-	push	yl
-	push	xh
-	push	xl
-	ldi	yl, low(hibjob)
-	ldi	yh, high(hibjob)
-tick110:			
-	ldd	xl, Z+jcb_joblist+0
-	ldd	xh, Z+jcb_joblist+1
-	sbiw	xh:xl, 1
-	std	Z+jcb_joblist+0,xl
-	std	Z+jcb_joblist+1,xh
-	brpl	tick120
-	ldd	xl, Z+jcb_link+0
-	ldd	xh, Z+jcb_link+1
-	std	Y+jcb_link+0, xl
-	std	Y+jcb_link+1, xh
-	ldi	xl, low(runjob)
-	ldi	xh, high(runjob)
-	std	Z+jcb_joblist+0, xl
-	std	Z+jcb_joblist+1, xh
-	ldd	xl, Z+jcb_flags
-	cbr	xl, jcb__hibernate_bm
-	std	Z+jcb_flags, xl		;;; remove hibernate flag
-	rcall	link			;;; our link does not change registers
-	movw	zh:zl, yh:yl
-tick120:
-	movw	yh:yl, zh:zl
-	ldd	zl, Y+jcb_link+0
-	ldd	zh, Y+jcb_link+1
-	sbiw	zh:zl, 0
-	brne	tick110
-	pop	xl
-	pop	xh
-	rjmp	sysret
-;--------------------------------------------------------------------------
-;
-;	Check the ioqueue for IO timeouts and it case we have one remove
-;	the io-queue control block from the queue and put the job back
-;	into the run queue.
-;
-iotick:
+	brne	tick150			; No need to check IO time-outs
+tick110:
 	ldi	zl, low(ioticks)
 	ldi	zh, high(ioticks)
 	sts	iotime+0, zl
-	sts	iotime+1, zh
+	sts	iotime+1, zh		; Reset IO time-out
 	lds	zl, ioqueue+0		; Get first IOQ Control Block
 	lds	zh, ioqueue+1
 	sbiw	zh:zl, 0
-	brne	iotick100
-	ret
-iotick100:				; We have at least one block in the queue
+	breq	tick150			; No IOQ Control Block
 	rtdbg	dbg_iotick, 1
-	push	yh			; So save resgister we need
-	push	yl
-	push	xh
-	push	xl
 	ldi	yl, low(ioqueue)	; Prepare address of "previous"
 	ldi	yh, high(ioqueue)
-iotick110:
+tick120:
 	ldd	xl, Z+ioq_timer+0
 	ldd	xh, Z+ioq_timer+1
 	sbiw	xh:xl, 1		; decrement timer
 	std	Z+ioq_timer+0, xl
 	std	Z+ioq_timer+1, xh
-	brpl	iotick120		; timer not expired
+	brpl	tick130			; timer not expired
 	push	yh			; Save link head pointer Y
 	push	yl
 	ldd	xl, Z+ioq_link+0	; Unlink this block from chain
 	ldd	xh, Z+ioq_link+1
-	chkaddr	xh, xl, chk_iotick
 	std	Y+ioq_link+0, xl	; i.e. let previous point to next or null
 	std	Y+ioq_link+1, xh	
 	ldd	xl, Z+ioq_flags		; update io conrol block flags
@@ -733,20 +685,62 @@ iotick110:
 	std	Y+25, xl		; set r24 of job
 	std	Y+26, xl		; set r25 of job 
 	rcall	link
+	set
 	pop	zl			; Restore link head pointer to Z
 	pop	zh			; 
-iotick120:
+tick130:
 	movw	yh:yl, zh:zl		; Make this block to the previous
 	ldd	zl, Y+ioq_link+0	; Get next block
 	ldd	zh, Y+ioq_link+1
 	sbiw	zh:zl, 0
-	brne	iotick110		; Yes there is another one
-	pop	xl
-	pop	xh
-	pop	yl
-	pop	yh
+	brne	tick120			; Yes there is another one
 	rtdbg	dbg_iotick, 0
-	ret
+tick150:
+	ldi	yl, low(hibjob)		;
+	ldi	yh, high(hibjob)
+tick160:			
+	ldd	zl, Y+jcb_link+0	; Get next job in hibjob queue
+	ldd	zh, Y+jcb_link+1
+	sbiw	zh:zl, 0
+	breq	tick180			; Done
+	ldd	xl, Z+jcb_joblist+0	; Get timeer which is stored in joblist
+	ldd	xh, Z+jcb_joblist+1	; and decrement it by one
+	sbiw	xh:xl, 1
+	std	Z+jcb_joblist+0,xl
+	std	Z+jcb_joblist+1,xh
+	brmi	tick170			; timer expired so wake-up this job
+	movw	yh:yl, zh:zl		; 
+	rjmp	tick160			; test with potentially next linked job
+tick170:
+	ldd	xl, Z+jcb_link+0	; timer of this job has expired, so get next
+	ldd	xh, Z+jcb_link+1	; job control block in hibjob queue and
+	std	Y+jcb_link+0, xl	; place it to previous link head, i.e. remove
+	std	Y+jcb_link+1, xh	; this job from the hibjob queue
+	ldi	xl, low(runjob)		; set the queue address to which this job
+	ldi	xh, high(runjob)	; control block will be queued
+	std	Z+jcb_joblist+0, xl
+	std	Z+jcb_joblist+1, xh
+	ldd	xl, Z+jcb_flags
+	cbr	xl, jcb__hibernate_bm
+	std	Z+jcb_flags, xl		;;; remove hibernate flag
+	rcall	link			;;; link to runjob queue according priority
+	set
+	rjmp	tick160			;;; try next job in hibjob queue
+tick180:
+	pop	xl
+	pop	xh			;;; restore additionally save registers
+	brtc	tick190			;;; runjob has not been altered 
+	rjmp	sysret			;;; has been altered, check for context switch
+tick190:
+	pop	yl			;;; return to whatever we have interrupted
+	pop	yh			;;; unwind stack 
+	pop	zl
+	pop	zh
+	out	CPU_SREG, r8		;;; restore status register
+	pop	r8			
+	rtdbg	dbg_tick, 0
+	reti				;;; retunr to interrupted job
+
 ;--------------------------------------------------------------------------
 ;
 ;	link a job into a list, jobs are queued with descending priority, at
@@ -814,7 +808,7 @@ link110:			; 110$:
 ;	or negative then it will timeout relatively fast (within seconds)
 ;
 suspend_:
-	tesoute	chk_suspend, zl, zh, r24, r25
+	tesoute	chk_suspend, r24, r25, r22, r23
 	chkaddr	r25, r24, chk_suspend
 	rtdbg	dbg_suspend, 1
 	movw	zh:zl, r25:r24
@@ -883,6 +877,7 @@ suspend030:
 ;
 ;	Z --->		io-queue control block
 ;	yl -->		io-status
+;	yh -->		optional tesout information
 ;
 ;	resume a task that was suspended to wait for IO, first we make
 ;	sure that there is a suspended task, if not we just set the
@@ -893,7 +888,7 @@ suspend030:
 ;	be updated accordingly
 ;
 resume:
-	tesoute	chk_resume, yl, yh, zl, zh
+	tesoute	chk_resume, zl, zh, yl, yh
 	chkaddr	zh, zl, chk_resume
 	rtdbg	dbg_resume, 1		; *** debugging ***
 	std	Z+ioq_iostat, yl	; Save io status in control block
@@ -995,7 +990,7 @@ resume050:
 ;
 ;
 acquire_:
-	tesoute	chk_acquire, zl, zh, r24, r25
+	tesoute	chk_acquire, r24, r25, r22, r23
 	rtdbg	dbg_acquire, 1
 	movw	zh:zl, r25:r24		;
 	ldd	yl, Z+0			; r1==Z
@@ -1056,7 +1051,7 @@ acquire120:			; 120$
 ;
 ;
 release_:	
-	tesoute	chk_release, zl, zh, r24, r25
+	tesoute	chk_release, r24, r25, r22, r23
 	rtdbg	dbg_release, 1
 	movw	zh:zl, r25:r24		; r0==Y
 	ldd	yl, Z+0			; r1==Z
@@ -1110,7 +1105,7 @@ release110:				; 110$:
 ;
 
 block_:
-	tesoute	chk_block, zl, zh, r24, r25
+	tesoute	chk_block, r24, r25, zl, zh
 	rtdbg	dbg_block, 1
 	movw	zh:zl, r25:r24
 	ldd	yl, Z+0
@@ -1181,7 +1176,7 @@ unblock_:
 ;	Z 	-> pointer to lock word
 ;
 unblocki:				;;; Entry for interrupt service routines
-	tesoute	chk_unblock, yl, yh, zl, zh
+	tesoute	chk_unblock, zl, zh, yl, yh
 	rtdbg	dbg_unblock, 1
 	ldd	yl, Z+0
 	ldd	yh, Z+1			;;; Get block status
@@ -1234,7 +1229,7 @@ unblock060:
 ;	r23:r22 -->	timeout
 ;
 waitqueue_:
-	tesoute	chk_waitqueue, zl, zh, r24, r25
+	tesoute	chk_waitqueue, r24, r25, r22, r23
 	rtdbg	dbg_waitqueue, 1	; *** debugging ***
 	movw	zh:zl, r25:r24		; Z=queue control block
 	ldd	yl, Z+ioq_flags
@@ -1323,7 +1318,7 @@ waitqueue120:
 ;	r23:r22 -->	record
 ;
 sigqueue_:
-	tesoute	chk_sigqueue, zl, zh, r24, r25
+	tesoute	chk_sigqueue, r24, r25, r22, r23
 	rtdbg	dbg_sigqueue, 1
 	movw	zh:zl, r25:r24		; Queue Control Block
 	ldd	yl, Z+ioq_flags
@@ -1464,23 +1459,6 @@ setpriority_:
 	pop	xl
 	pop	xh			;;; Restore work register
 	rjmp	sysretout		;;; 
-;--------------------------------------------------------------------------
-;
-;	Testoutput 
-;
-tesoutput_:
-	mov	yl, r20			;;;
-	andi	yl, 0x0F		;;; ID is only 4 bits for the moment
-	ori	yl, chk_tesout
-	sts	tesoutent+0, yl
-	lds	yl, curjob
-	sts	tesoutent+1, yl
-	sts	tesoutent+2, r22
-	sts	tesoutent+3, r23
-	sts	tesoutent+4, r24	;;; 
-	sts	tesoutent+5, r25	;;;
-	rjmp	sysextout
-
 ;--------------------------------------------------------------------------
 ;
 ;	creates a job. you need a job control block setup with the values 
