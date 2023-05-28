@@ -676,8 +676,9 @@ tick120:
 	ldd	xh, Z+ioq_link+1
 	std	Y+ioq_link+0, xl	; i.e. let previous point to next or null
 	std	Y+ioq_link+1, xh	
-	ldd	xl, Z+ioq_flags		; update io conrol block flags
-	cbr	xl, ioq__suspend_bm | ioq__job_bm
+	ldi	xl, ioq__timeout_bm
+;	ldd	xl, Z+ioq_flags		; update io conrol block flags
+;	cbr	xl, ioq__suspend_bm | ioq__job_bm
 	std	Z+ioq_flags, xl		; Set timeout flag in ioq control block
 	rtdbg	dbg_suspendflag, 0
 	ldd	xl, Z+ioq_queue+0	; Get job control block of waiting job
@@ -891,13 +892,14 @@ suspend030:
 ;	the suspended task into the runjob queue. Fields and flags will
 ;	be updated accordingly
 ;
-resume:
-	tesoute	chk_resume, zl, zh, yl, yh
+resume:	tesoute	chk_resume, zl, zh, yl, yh
 	chkaddr	zh, zl, chk_resume
 	rtdbg	dbg_resume, 1		; *** debugging ***
 	std	Z+ioq_iostat, yl	; Save io status in control block
 	push	yh
 	push	yl
+	push	xh
+	push	xl			
 	ldd	yl, Z+ioq_flags
 	sbrc	yl, ioq__suspend_bp
 	rjmp	resume010		; A job is suspended
@@ -905,12 +907,8 @@ resume:
 	rtdbg	dbg_resumeflag, 1	; *** debugging ***
 	std	Z+ioq_flags, yl		;
 	tesflag	0x01, yl
-	pop	yl
-	pop	yh
-	ret				; done
+	rjmp	resume060
 resume010:
-	push	xh
-	push	xl			
 	ldi	yl, low(ioqueue)
 	ldi	yh, high(ioqueue)
 resume020:
@@ -924,15 +922,11 @@ resume020:
 	movw	yh:yl, xh:xl
 	rjmp	resume020
 resume030:				; attempt to resume a non-suspended ioq
-	pop	xl			; we should actually call the crash
-	pop	xh			; handler
-	tesflag	0x02, yl
-	pop	yl
-	pop	yh
-	ret				; Nothing to resume
+	tesflag	0x02, yl		; we should actually call the crash handler
+	rjmp	resume060		;
 resume040:
-	clr	xl
-	std	Z+ioq_flags, xl		; clear all flag
+	ldi	xl, ioq__iodone_bm	; set iodone flag
+	std	Z+ioq_flags, xl		; 
 	ldd	xl, Z+ioq_link+0	; Remove this io-queue control block
 	ldd	xh, Z+ioq_link+1	; from queue, let previous point to next
 	chkaddr	xh, xl, chk_resume+1
@@ -945,12 +939,6 @@ resume040:
 	ldd	yh, Z+ioq_queue+1
 	sbiw	yh:yl, 0
 	breq	resume050
-	ldd	xl, Z+ioq_iostat	; Setup return value for job
-	ldi	xh, ioq__iodone_bm	;
-	ldd	zl, Y+jcb_stack+0	; Get stack pointer of job to Z register
-	ldd	zh, Y+jcb_stack+1
-	std	Z+25, xl		; Save return status
-	std	Z+26, xh
 	ldi	xl, low(runjob)
 	ldi	xh, high(runjob)
 	std	Y+jcb_joblist+0, xl
@@ -961,16 +949,12 @@ resume040:
 	std	Y+jcb_flags, xl
 	movw	zh:zl, yh:yl
 	rcall	link
-	pop	xl
-	pop	xh
-	pop	yl
-	pop	yh
-	rtdbg	dbg_resume, 0		; *** debugging ***
-	ret
+	rjmp	resume060
 resume050:
+	tesflag	0x04, yl
+resume060:
 	pop	xl
 	pop	xh
-	tesflag	0x04, yl
 	pop	yl
 	pop	yh
 	rtdbg	dbg_resume, 0		; *** debugging ***

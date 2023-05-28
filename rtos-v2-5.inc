@@ -221,4 +221,6 @@ record		ioq, flags, 1
 	.equ	ioq__record_bm	= 0x08
 	.equ	ioq__job_bp	= 4		; Waitqueue has job waiting
 	.equ	ioq__job_bm	= 0x10
+	.equ	ioq__timeout_bp	= 7
+	.equ	ioq__timeout_bm = 0x80
 recordend	ioq, size
