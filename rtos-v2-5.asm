@@ -1104,7 +1104,9 @@ block010:
 	rtdbg	dbg_block, 0
 	pop	xl
 	pop	xh
+	sbic	GPR_GPR0, tesoutblock_bp
 	rjmp	sysretout
+	rjmp	sysret
 
 ;--------------------------------------------------------------------------
 ;	
@@ -1175,7 +1177,9 @@ unblock060:
 	rtdbg	dbg_unblock, 0
 	pop	xl
 	pop	xh
+	sbic	GPR_GPR0, tesoutblock_bp
 	rjmp	sysretout
+	rjmp	sysret
 ;--------------------------------------------------------------------------
 ;
 ;	r25:r24 -->	queue control block
@@ -1218,7 +1222,7 @@ waitqueue110:				; no record and no job is waiting
 	clr	r24			; zero timeout and no record
 	clr	r25
 	rjmp	sysextout
-	
+
 waitqueue120:
 	sbr	yl, ioq__job_bm		; set job wait flag
 	std	Z+ioq_flags, yl		;
@@ -1339,11 +1343,9 @@ delay_:
 	lds	yh, runjob+1		;;; Get Job
 	std	Y+jcb_joblist+0, r24
 	std	Y+jcb_joblist+1, r25	;;; Set Ticks (reuse joblist word in JCB)
-
 	ldd	zl, Y+jcb_flags
 	sbr	zl, jcb__hibernate_bm
 	std	Y+jcb_flags, zl		;;; Set hibernate flag
-
 	ldd	zl, Y+0
 	ldd	zh, Y+1			;;; Get Next Job (or 0 if this was the last)
 	sts	runjob+0, zl
