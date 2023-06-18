@@ -26,7 +26,6 @@ cvtdone:
 	brts	cvtdig
 	ldi	r24, ' '
 cvtdig:
-;	st	X+, r24
 	subi	r20, low(-@0)
 	sbci	r21, high(-@0)
 	sbci	r22, byte3(-@0)
@@ -46,7 +45,6 @@ cvtdone:
 	brts	cvtdig
 	ldi	r24, ' '
 cvtdig:
-;	st	X+, r24
 	subi	r20, low(-@0)
 	sbci	r21, high(-@0)
 .endmacro	
