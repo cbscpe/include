@@ -101,6 +101,11 @@
 ;				when link is called xl, xh have already been
 ;				saved on the stack and where not required to
 ;				be preserved, this also saves stack
+;	2023-05-30	PS	Testoutput, Address Check. In resume return
+;				the iostatus only in the ioq and not in the
+;				callers register as it is supsected to corrupt
+;				r24, r25, randomly. Combine tick and iotick 
+;				to one single routine
 ;
 ;--------------------------------------------------------------------------
 	.cseg
@@ -381,10 +386,10 @@ tesoutput_:
 	sts	tesoutent+0, yl
 	lds	yl, curjob
 	sts	tesoutent+1, yl
-	sts	tesoutent+2, r24
-	sts	tesoutent+3, r25
-	sts	tesoutent+4, r23	;;; 
-	sts	tesoutent+5, r24	;;;
+	sts	tesoutent+2, r24	;;;
+	sts	tesoutent+3, r25	;;;
+	sts	tesoutent+4, r22	;;; 
+	sts	tesoutent+5, r23	;;;
 ;--------------------------------------------------------------------------
 ;
 ;	Exit system without context switch
@@ -650,7 +655,7 @@ tick:
 	sbiw	zh:zl, 1
 	sts	iotime+0, zl
 	sts	iotime+1, zh
-	brne	tick150			; No need to check IO time-outs
+	brpl	tick150			; No need to check IO time-outs
 tick110:
 	ldi	zl, low(ioticks)
 	ldi	zh, high(ioticks)
@@ -1236,6 +1241,8 @@ waitqueue120:
 	lds	yh, runjob+1
 	std	Z+ioq_queue+0, yl	; save it into the ioq control block
 	std	Z+ioq_queue+1, yh	; 
+	std	Y+jcb_joblist+0, zl	; 
+	std	Y+jcb_joblist+1, zh	;
 	ldd	zl, Y+jcb_flags		; set the suspend flag in our jcb
 	sbr	zl, jcb__wait_bm
 	std	Y+jcb_flags, zl

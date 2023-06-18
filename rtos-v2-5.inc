@@ -110,6 +110,11 @@ c020:
 #endif
 .endm
 
+#ifdef tesout
+.equ	tesoutbuf	= 0x7000
+.equ	tesoutlen	= 0x0800
+#endif
+
 ;--------------------------------------------------------------------------
 ;
 ;	Reset the TICK timer interrupt, this depends on the MCU
@@ -131,10 +136,6 @@ c020:
 ;	data section
 ;
 		.dseg
-#ifdef tesout
-.equ	tesoutbuf	= 0x7000
-.equ	tesoutlen	= 0x0800
-#endif
 		align	4
 runjob:		.byte	2		; Initialise with 0
 curjob:		.byte	2		; Initialise with 0
@@ -165,9 +166,9 @@ nstack:
 ;	JCB	- Job Control Block
 ;
 recordstart	jcb
-record		jcb, link, 2
-record		jcb, stack, 2
-record		jcb, joblist, 2
+record		jcb, link, 2		; Link header to queue JCBs
+record		jcb, stack, 2		; Saved Stack Pointer
+record		jcb, joblist, 2		; Address of queue to which this JCB is queued
 record		jcb, priority, 1
 record		jcb, flags, 1
 ;
