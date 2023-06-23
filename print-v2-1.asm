@@ -418,12 +418,13 @@ printxf0sub010:
 	call	serout
 printxf0sub020:
 	ldi	r24, '0'
+printxf0sub025:
+	cpi	r20, 10
+	brlo	printxf0sub030
 	subi	r20, 10
-printxf0sub030:
 	inc	r24
-	subi	r20, 10
-	brpl	printxf0sub030
-	subi	r20, -10
+	rjmp	printxf0sub025
+printxf0sub030:
 	call	serout
 printxf0sub040:
 	mov	r24, r20
