@@ -142,15 +142,8 @@
 ;	we may just use reti to exit the OS.
 ;
 rtos_:
-	sbis	b_RTOS			; Is it an OSCALL software interrupt
-	rjmp	oscall_			; yes ->
-
-	ldi	r16, crash_spurious	; 
-	jmp	crash			; crashdump (at the moment simple crash)
-
-	reti				; should never happen
-	
-oscall_:				; 
+	sbic	b_RTOS			; Is it an OSCALL software interrupt
+	rjmp	rtos_010		; no -> crash
 	push	r8			; save minimal context
 	in	r8, CPU_SREG
 	sbi	b_RTOS			; important, between setting the pin and
@@ -160,6 +153,13 @@ oscall_:				;
 	push	yl
 	sbi	f_RTOS			; Acknowledge interrupt
 	ijmp				; Note: if b_RTOS has been cleared Z is valid
+
+rtos_010:
+	ldi	r16, crash_spurious	; 
+	jmp	crash			; crashdump (at the moment simple crash)
+
+	reti				; should never happen
+	
 ;
 suspend:	oscall	suspend_
 acquire:	oscall	acquire_

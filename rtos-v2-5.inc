@@ -41,6 +41,7 @@
 #define	chk_tesout	0xD0
 #define chk_invalid	0xF0
 
+#define crash_rtos	0xFD
 #define crash_nojob	0xFE
 #define	crash_spurious	0xFF
 ;--------------------------------------------------------------------------
@@ -172,15 +173,15 @@ record		jcb, joblist, 2		; Address of queue to which this JCB is queued
 record		jcb, priority, 1
 record		jcb, flags, 1
 ;
-;
-;
 	.equ	jcb__hibernate_bp = 0		; Task is in hibjob queue [delay()]
 	.equ	jcb__hibernate_bm = 0x01
 	.equ	jcb__suspend_bp	= 1		; Task is suspended
 	.equ	jcb__suspend_bm	= 0x02
 	.equ	jcb__wait_bp = 2		; Task is waitqueued
 	.equ	jcb__wait_bm = 0x04
-record		jcb, iostat, 2			; 
+;
+record		jcb, iostat, 1			; 
+record		jcb, iobyte, 1			; 
 record		jcb, jobname, 2			; 
 recordend	jcb, size
 ;
