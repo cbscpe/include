@@ -408,8 +408,8 @@ scanqstringerr:
 	sec
 	ret
 scanqstringq:
-	mov	r24, r22
-	call	serout_4
+;	mov	r24, r22
+;	call	serout_4
 	sts	scanresult+0, xl
 	sts	scanresult+1, xh
 	ldi	r23, 0xff
@@ -472,7 +472,7 @@ scanname010:
 	cpi	r23, 'Z'+1
 	brsh	scannameinv
 scannamenext:					
-	ld	r23, X+		; Convert to upper case
+	ld	r23, X+			; Convert to upper case
 	cpi	r23, 0x60
 	brlo	scanname020
 	andi	r23, 0x5f
@@ -649,7 +649,7 @@ scannumberishex:
 	andi	r23, 0x5F		; Perhaps yes make sure we have upper case only
 scannumberishex010:
 	ldi	r22,0x30		; 
-	eor	r23,r22		; Convert 
+	eor	r23,r22			; Convert 
 	cpi	r23,0x0A		; was the character between '0' and '9'
 	brlo	scannumberishex020	; yes so we have a digit
 	subi	r23,-0x89		; Convert so 'A' to 'F' are mapped to 0xFA to 0xFF
@@ -667,7 +667,7 @@ scannumberishex020:
 ;
 scannumberisdec:	
 	ldi	r22,0x30		; 
-	eor	r23,r22		; Convert 
+	eor	r23,r22			; Convert 
 	cpi	r23,0x0A		; was the character between '0' and '9'
 	brlo	scannumberisdec020	; yes so we have a digit
 	sec
@@ -680,7 +680,7 @@ scannumberisdec020:
 ;
 scannumberisoct:	
 	ldi	r22,0x30		; 
-	eor	r23,r22		; Convert 
+	eor	r23,r22			; Convert 
 	cpi	r23,0x08		; was the character between '0' and '9'
 	brlo	scannumberisoct020	; yes so we have a digit
 	sec
