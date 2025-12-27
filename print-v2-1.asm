@@ -32,6 +32,7 @@
 ;			All registers preserved
 ;			
 ;	2022-12-22	uint8_t left justified
+;	2024-01-07	avoid using register zero
 ;
 ;	call	print
 ;	.db	<string>
@@ -375,20 +376,23 @@ printxe0sub:
 	ldi	zl, low(2*rad50tab)
 	ldi	zh, high(2*rad50tab)
 	add	zl, r24
-	adc	zh, zero
+	clr	r24
+	adc	zh, r24
 	lpm	r24, Z
 	call	serout
 	rad50	rad1
 	ldi	zl, low(2*rad50tab)
 	ldi	zh, high(2*rad50tab)
 	add	zl, r24
-	adc	zh, zero
+	clr	r24
+	adc	zh, r24
 	lpm	r24, Z
 	call	serout
 	ldi	zl, low(2*rad50tab)
 	ldi	zh, high(2*rad50tab)
 	add	zl, r20
-	adc	zh, zero
+	clr	r24
+	adc	zh, r24
 	lpm	r24, Z
 	call	serout
 	pop	zh
