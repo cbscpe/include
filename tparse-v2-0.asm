@@ -761,7 +761,7 @@ scannumberishex:
 	andi	r23, 0x5F		; Perhaps yes make sure we have upper case only
 scannumberishex010:
 	ldi	r22,0x30		; 
-	eor	r23,r22		; Convert 
+	eor	r23,r22			; Convert 
 	cpi	r23,0x0A		; was the character between '0' and '9'
 	brlo	scannumberishex020	; yes so we have a digit
 	subi	r23,-0x89		; Convert so 'A' to 'F' are mapped to 0xFA to 0xFF
