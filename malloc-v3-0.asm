@@ -56,10 +56,6 @@ malloc:
 	push	yh
 	push	zl
 	push	zh
-malloc100:
-	sbis	b_RTOS		;;; check ISR has been executed
-	rjmp	malloc100	;;; 
-	sbi	f_RTOS		; acknowledge interrupt
 ;
 ;
 ;
@@ -202,10 +198,6 @@ free:
 	push	yh
 	push	zl
 	push	zh
-free100:
-	sbis	b_RTOS		;;; check ISR has been executed
-	rjmp	free100		;;;
-	sbi	f_RTOS		;;; acknowledge
 ;
 ;
 ;
