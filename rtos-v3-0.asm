@@ -826,7 +826,7 @@ iotick:
 	sbci	zl, byte4(-1)
 	sts	sysuptime+3, zl
 
-	sbi	i_LED3			;;; Toggle LED3 just during test
+;	sbi	i_LED3			;;; Toggle LED3 just during test
 	lds	zl, ioqueue+0		;;; Get first IOQ Control Block
 	lds	zh, ioqueue+1
 	sbiw	zh:zl, 0
