@@ -271,7 +271,7 @@ intsave:
 	mov	zh, r8		; copy high address
 	in	r8, CPU_SREG	; save status register
 ;
-;	Here we have a stack frame as if we hav called a RT-OS function, ready
+;	Here we have a stack frame as if we have called a RT-OS function, ready
 ;	for sysret/sysext to return to the first job
 ;
 ; SP--->
@@ -283,30 +283,8 @@ intsave:
 ;	.byte	1	; pch
 ;	.byte	1	; pcl
 ;
-	ldi	yl, low(sysret)	; Prepare stack with return address to sysret
-	ldi	yh, high(sysret); so the ISR just needs to executed a ret to exit.
-	push	yl
-	push	yh
-;
-;	On top of the stack we have the address to return from the OS, next we
-;	have the stack as expected by sysret/sysext with registers yl, yh, zl, 
-;	zh, r8 saved on stack and SREG saved in r8. This ISR may now freely use
-;	registers yl, yh, zl, zh and then just execute a ret instruction to exit
-;	the ISR, of course it must clear all interrupt flags 
-;
-; SP--->
-; +1	.byte	1	; high(sysret)
-; +2	.byte	1	; low(sysret)
-; +3	.byte	1	; yl
-; +4	.byte	1	; yh
-; +5	.byte	1	; zl
-; +6	.byte	1	; zh
-; +7	.byte	1	; r8
-; +8	.byte	1	; pch
-; +9	.byte	1	; pcl
-;
-	ijmp			; Jump back to ISR, the ISR then only needs
-				; to execute a ret instruction
+	icall			; Call back the ISR
+	rjmp	sysret
 
 ;--------------------------------------------------------------------------
 ;
@@ -797,13 +775,6 @@ tick190:
 ;
 ;
 iotick:
-;	push	r18
-;	ldi	r18, RTC_OVF_bm		; Acknowledge RTC overflow interrupt
-;	sts	RTC_INTFLAGS, r18
-;	sbi	i_LED3			; Toggle LED3 just during test
-;	pop	r18
-;	reti
-
 	rtdbg	dbg_iotick, 1
 	push	r8			;;; Save Context
 	in	r8, CPU_SREG		;;; 
@@ -826,7 +797,6 @@ iotick:
 	sbci	zl, byte4(-1)
 	sts	sysuptime+3, zl
 
-;	sbi	i_LED3			;;; Toggle LED3 just during test
 	lds	zl, ioqueue+0		;;; Get first IOQ Control Block
 	lds	zh, ioqueue+1
 	sbiw	zh:zl, 0
