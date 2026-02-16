@@ -124,7 +124,7 @@ scancommand:
 ;	accept the syntax element or set the carry to 
 ;	reject the syntax element. 
 ;
-;	Action routines may change registers r16-25, zl and zh
+;	Action routines may change registers r16-27, zl and zh
 ;	all other registers must be preserved
 ;
 	movw	zh:zl, r25:r24
