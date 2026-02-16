@@ -7,6 +7,7 @@ specifier
 c	Character
 d	Decimal
 o	Octal
+r	Radix 50
 s	String
 u	Unsigned
 x	Hexadecimal
@@ -18,17 +19,18 @@ non-standard specifiers
 R	Carriage Return + Line Feed
 T	Tab
 
-
-
 flags
 ----
 
 -	left justified
+0	leading zero
+'	thousands
+#	leading 0 for octal, leading 0x for hexadecimal and trailing dot for decimal
 
 width
 -----
 
-nnn	decimal number
+nnn	decimal number, must not start with 0
 
 precision
 ---------
@@ -42,7 +44,6 @@ b	8-bit
 h	16-bit
 a	24-bit
 l	32-bit
-
 
 ;--------------------------------------------------------------------------
 ;
@@ -83,12 +84,15 @@ printf:
 ;-	sts	0x5004, zl
 ;-	sts	0x5005, zh
 	sbiw	zh:zl, 2		; go back to msg pointer
+	clr	r24
 	lsl	zl			; Make byte index
 	rol	zh
-	lpm	yl, Z+			; get message pointer
-	lpm	yh, Z+
-	lpm	xl, Z+			; get data pointer
-	lpm	xh, Z+
+	rol	r24
+	out	CPU_RAMPZ, r24
+	elpm	yl, Z+			; get message pointer
+	elpm	yh, Z+
+	elpm	xl, Z+			; get data pointer
+	elpm	xh, Z+
 ;-	sts	0x5006, yl
 ;-	sts	0x5007, yh
 ;	ldi	r24, CR
