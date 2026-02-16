@@ -20,16 +20,30 @@ FreeList:
 	push	zl
 	push	zh
 ;	
-FreeListNext:
 	ldd	yl, Z+0			; Get next packet address
 	ldd	yh, Z+1
-	movw	r25:r24, Y		; 
-	ldd	zl, Y+0			; Get linked packet address
+FreeListNext:
+	ldd	zl, Y+0			; Remember Next
 	ldd	zh, Y+1
+;
+;	
+;	
+;	sbiw	yh:yl, 2
+;	ld	r24, Y+
+;	ld	r25, Y+
+;	sts	pprint+0, r24
+;	sts	pprint+1, r25
+;	sts	pprint+2, yl
+;	sts	pprint+3, yh
+;	call	print
+;	.db	CR, LF, "Free 0x", 0x81, 0x80, " bytes at 0x", 0x83, 0x82, 0
+;
+;
+;
+	movw	r25:r24, yh:yl
 	call	free			; Free this packet
-;	cp	zl, zero		; Check next packet address
-;	cpc	zh, zero
-	sbiw	zh:zl, 0
+	movw	yh:yl, zh:zl
+	sbiw	yh:yl, 0
 	brne	FreeListNext		; there is still another one
 ;
 	pop	zh
