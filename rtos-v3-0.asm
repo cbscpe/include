@@ -147,6 +147,8 @@
 ;				of the jcb address
 ;_______________________________________________________________________________________
 ;
+;	Version 3 of RT-OS
+;
 ;	2024-02-13	PS	Version 3 replacing previous 3rd version
 ;				Supports only new calling convention
 ;				oscall macro now has to be at the entry of the function
@@ -163,6 +165,9 @@
 ;				clears b_RTOS and starts saving registers and
 ;				expects all the handling of b_RTOS, f_RTOS and
 ;				delays to be handled by the ISR
+;	2026-05-19	PS	Add "Marker" on job stack when performing a 
+;				context switch to get an idea of how much stack
+;				is required per job
 ;
 ;--------------------------------------------------------------------------
 	.cseg
@@ -595,6 +600,12 @@ sysret:
 	in	r1, CPU_SPH
 	std	Z+jcb_stack+0, r0
 	std	Z+jcb_stack+1, r1	;;; Save stack pointer of current context
+	ldi	r16, 0xA5		;;; Set the bottom marker in job stack
+	ldi	r17, 0x5A		;;; Set the bottom marker in job stack
+	push	r16			;;; Set the bottom marker in job stack
+	push	r17			;;; Set the bottom marker in job stack
+	pop	r17			;;; Set the bottom marker in job stack
+	pop	r16			;;; Set the bottom marker in job stack
 ;--------------------------------------------------------------------------
 ;
 ;	All Register are now saved we can now load a new context
