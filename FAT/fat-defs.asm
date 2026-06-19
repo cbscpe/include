@@ -54,7 +54,7 @@
 ;
 ;	FAT16 specific
 ;
-.equ	V_FAT16Label	= 0x02b		;11 bytes	FAT-16 Parition Label
+.equ	V_FAT16Label	= 0x02b		;11 bytes	FAT-16 Partition Label
 ;
 ;	FAT32 specific
 ;

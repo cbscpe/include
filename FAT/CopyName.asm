@@ -31,16 +31,6 @@ CopyName:
 	push	zh
 	ldi	zl, low(NameBuffer)
 	ldi	zh, high(NameBuffer)
-;++++
-;	sts	pprint+0, xl
-;	sts	pprint+1, xh
-;	sts	pprint+2, zl
-;	sts	pprint+3, zh
-;	call	print
-;	.db	CR, LF
-;	;	"----+----1----+----2----+"
-;	.db	"Copy Name Entry     X->0x", 0x81, 0x80, " Z->0x", 0x83, 0x82, CR, LF, 0
-;----
 	clt
 CopyNameLoop:
 	ld	r24, X+
@@ -59,23 +49,6 @@ CopyNameLoop:
 ;
 CopyNameDone:
 	st	-Z, zero
-;++++
-;	in	r16, CPU_SREG		; preserve T-Bit
-;	sts	pprint+0, xl
-;	sts	pprint+1, xh
-;	sts	pprint+2, zl
-;	sts	pprint+3, zh
-;	sts	pprint+4, r24
-;	ldi	r17, '0'
-;	bld	r17, 0
-;	sts	pprint+5, r17
-;	call	print
-;	;	"----+----1----+----2----+"
-;	.db	"Copy Name Delimiter 0x", 0x84, SPACE, CR, LF
-;	.db	"T-Bit              '", 0x95, "'", CR, LF
-;	.db	"Copy Name Exit      X->0x", 0x81, 0x80, " Z->0x", 0x83, 0x82, CR, LF, 0
-;	out	CPU_SREG, r16
-;----
 	pop	zh
 	pop	zl
 	ret

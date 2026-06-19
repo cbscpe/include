@@ -1,5 +1,3 @@
-
-
 ;--------------------------------------------------------------------------
 ;
 ;	Name2DirEntry
@@ -42,20 +40,6 @@ Name2DirEntry:; uint8_t Name2DirEntry(struct* VolumeControlBlock, char* name)
 	
 	movw	r7:r6, r23:r22
 	movw	yh:yl, r25:r24
-;++++
-;	movw	xh:xl, r7:r6
-;	call	print
-;	.db	CR, LF, "Name2DirEntry '", 0
-;debugName2DirEntry010:
-;	ld	r24, X+
-;	cpi	r24, NULL
-;	breq	debugName2DirEntry020
-;	call	serout
-;	rjmp	debugName2DirEntry010
-;debugName2DirEntry020:
-;	call	print
-;	.db	"'", CR, LF, 0
-;----
 ;
 ;	Prepare the starting point
 ;

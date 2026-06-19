@@ -1,5 +1,3 @@
-
-
 ;--------------------------------------------------------------------------
 ;
 ;	Read Directory Entry and returns a pointer either to the next active
@@ -27,19 +25,16 @@ ReadDir:;(struct* VolumeControlBlock);
 	movw	yh:yl, r25:r24
 	ldd	zl, Y+Vol_diriob+0
 	ldd	zh, Y+Vol_diriob+1
-;-	rcall	debugReadDir;+++
 	ldd	r18, Y+Vol_Status
 	cbr	r18, 1<<Vol__Long
 	std	Y+Vol_Status, r18	; No Long File Name so far
 ReadDirEntry:
-;-	rcall	debugReadDirEntry;++++
 	ldd	r18, Y+Vol_DirCount	; Get number of entries already processed
 	inc	r18			; Another entry processed
 	std	Y+Vol_DirCount, r18
 	cpi	r18, (512/32)		; 
 	brne	ReadDirThis
 ;ReadNxtDir:				; We require the next sector of the direcotry
-;-	rcall	debugReadNxtDir;++++
 	ldd	r18, Z+P_NumSect	; Decrement sectors to read
 	dec	r18			; done in directory
 	std	Z+P_NumSect, r18	; 
@@ -65,7 +60,6 @@ ReadDirEntry:
 	ldd	zh, Y+Vol_diriob+1	; Restore IO Parameter Block Pointer
 	ldd	r18, Y+Vol_sectperclst	; Re-initialise number of 
 	std	Z+P_NumSect, r18	; sectors in cluster.
-;-	rcall	debugReadNXtDir2;++++
 	rjmp	ReadNxtReadSect
 ;
 ;	Read next directory sector of the current cluster or FAT16 root directory
@@ -86,7 +80,6 @@ ReadNxtDirSect:
 	std	Z+P_Sector+2, r18
 	std	Z+P_Sector+3, r19
 ReadNxtReadSect:
-;-	rcall	debugReadNxtDirSect;++++
 	ldi	r18, -1
 	std	Y+Vol_DirCount, r18	; No directory entries in sector processed
 	ldd	r16, Z+P_Address+0
@@ -192,7 +185,6 @@ ReadDirCopy020:
 	ldi	xh, high(LongFileN)
 	add	xl, r19
 	adc	xh, zero
-;-	rcall	debugReadDirCopy;++++
 	ldd	r18, Z+D_Name+1		; copy the 13 locations, note that the
 	st	X+, r18			; string in the extension is 0x0000 terminated
 	ldd	r18, Z+D_Name+3		; we assume only ASCII double characeters
@@ -220,83 +212,3 @@ ReadDirCopy020:
 	ldd	r18, Z+D_Name+30
 	st	X+, r18
 	rjmp	ReadDirNext
-
-debugReadDir:
-	ldd	r21, Z+P_NumSect
-	sts	pprint+0, r21
-	call	print
-	.db	CR, LF
-		;----+----1----+----2----+----3
-	.db	"ReadDir P_NumSect.......... 0x", 0x80, CR, LF, 0
-	ret
-	
-debugReadDirEntry:
-	ldd	r21, Y+Vol_DirCount
-	sts	pprint+0, r21
-	call	print
-		;----+----1----+----2----+----3
-	.db	"ReadDirEntry Vol_DirCount.. 0x", 0x80, CR, LF, 0
-	ret
-
-debugReadNxtDir:
-	ldd	r21, Z+P_NumSect
-	sts	pprint+0, r21
-	sts	pprint+2, zl
-	sts	pprint+3, zh
-	call	print
-		;----+----1----+----2----+----3
-	.db	"ReadNxtDir IOB............. 0x", 0x83, 0x82, CR, LF
-	.db	"ReadNxtDir P_NumSect......  0x", 0x80, CR, LF, 0
-	ret
-
-debugOpenDirAll:
-	ldd	r21, Z+P_Sector+0
-	sts	pprint+0, r21
-	ldd	r21, Z+P_Sector+1
-	sts	pprint+1, r21
-	ldd	r21, Z+P_Sector+2
-	sts	pprint+2, r21
-	ldd	r21, Z+P_Sector+3
-	sts	pprint+3, r21
-	ldd	r21, Z+P_NumSect
-	sts	pprint+4, r21
-	call	print
-		;----+----1----+----2----+----3
-	.db	"OpenDirAll P_Sector........ 0x", 0x83, 0x82, 0x81, 0x80, CR, LF
-	.db	"OpenDirAll P_NumSect......  0x", 0x84, CR, LF, 0
-	ret
-	
-debugReadNxtDirSect:
-	ldd	r21, Z+P_Sector+0
-	sts	pprint+0, r21
-	ldd	r21, Z+P_Sector+1
-	sts	pprint+1, r21
-	ldd	r21, Z+P_Sector+2
-	sts	pprint+2, r21
-	ldd	r21, Z+P_Sector+3
-	sts	pprint+3, r21
-	call	print
-		;----+----1----+----2----+----3
-	.db	"ReadNxtDirSect P_Sector.... 0x", 0x83, 0x82, 0x81, 0x80, CR, LF, 0, 0
-	ret
-
-debugReadNXtDir2:
-	ldd	r21, Z+P_Sector+0
-	sts	pprint+0, r21
-	ldd	r21, Z+P_Sector+1
-	sts	pprint+1, r21
-	ldd	r21, Z+P_Sector+2
-	sts	pprint+2, r21
-	ldd	r21, Z+P_Sector+3
-	sts	pprint+3, r21
-	call	print
-		;----+----1----+----2----+----3
-	.db	"Cluster2Sector P_Sector.... 0x", 0x83, 0x82, 0x81, 0x80, CR, LF, 0, 0
-	ret
-
-debugReadDirCopy:
-	sts	pprint+0, r19
-	call	print
-		;----+----1----+----2----+----3
-	.db	"ReadDirCopy Name Offset...  0x", 0x80, CR, LF, 0
-	ret

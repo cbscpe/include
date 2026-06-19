@@ -37,44 +37,6 @@ MatchFileName:;uint8_t (struct* VolumeControlBlock);
 	push	yl
 	push	yh
 	movw	yh:yl, r25:r24
-;++++
-;	ldi	xl, low(NameBuffer)
-;	ldi	xh, high(NameBuffer)	; Get pointer to the name to match
-;	call	print
-;	.db	CR, LF, "MatchFileName '", 0
-;debugMatchFileName010:
-;	ld	r24, X+
-;	cpi	r24, NULL
-;	breq	debugMatchFileName020
-;	call	serout
-;	rjmp	debugMatchFileName010
-;debugMatchFileName020:
-;	call	print
-;	.db	"'", CR, LF, 0
-;	
-;debugMatchFileName030:
-;	ldd	r16, Y+Vol_UpdatePtr+0
-;	ldd	r17, Y+Vol_UpdatePtr+1
-;	sts	pprint+0, r16
-;	sts	pprint+1, r17
-;	ldd	zl, Y+Vol_diriob+0
-;	ldd	zh, Y+Vol_diriob+1
-;	ldd	r16, Z+P_Cluster+0
-;	ldd	r17, Z+P_Cluster+1
-;	ldd	r18, Z+P_Cluster+2
-;	ldd	r19, Z+P_Cluster+3
-;	sts	pprint+2, r16
-;	sts	pprint+3, r17
-;	sts	pprint+4, r18
-;	sts	pprint+5, r19
-;	call	print
-;	.db	TAB, "DirName Pointer. 0x", 0x81, 0x80, CR, LF
-;	.db	TAB, "Cluster......... 0x", 0x85, 0x84, 0x83, 0x882, CR, LF
-;	.dw	NULL
-;debugMatchFileName040:
-;debugMatchFileName050:
-;----
-;
 ;
 	ldi	xl, low(NameBuffer)
 	ldi	xh, high(NameBuffer)	; Get pointer to the name to match
