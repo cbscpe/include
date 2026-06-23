@@ -10,7 +10,35 @@
 ;	that only use a byte index but have a fixed highorder byte 
 ;	address
 ;
+.macro	align             ;align to (1<<@0)
+alignfromhere:
+      .if (alignfromhere & ((1<<@0)-1))   ;if not already aligned
+         .org  (alignfromhere & (0xffff<<@0)) + (1<<@0)
+      .endif
+.endmacro
 
+;--------------------------------------------------------------------------
+;
+;	Create code for upper/lower case conversion
+;
+.macro	uppercase
+	cpi		@0, 0x60			; lower case ?
+	brlo	l1
+	andi	@0, 0x5F			; Perhaps yes make sure we have upper case only
+l1:
+.endmacro
+.macro	ucase
+	cpi		@0, 0x60			; lower case ?
+	brlo	l1
+	andi	@0, 0x5F			; Perhaps yes make sure we have upper case only
+l1:
+.endmacro
+
+;--------------------------------------------------------------------------
+;
+;	print digit macro to convert 32-bit and 16-bit integer to 
+;	ASCII decimal
+;
 .macro	pdigit4
 	ldi	r24, '0'
 cvtloop:
@@ -51,25 +79,7 @@ cvtdig:
 
 
 
-.macro	align             ;align to (1<<@0)
-alignfromhere:
-      .if (alignfromhere & ((1<<@0)-1))   ;if not already aligned
-         .org  (alignfromhere & (0xffff<<@0)) + (1<<@0)
-      .endif
-.endmacro
 
-.macro	uppercase
-	cpi		@0, 0x60			; lower case ?
-	brlo	l1
-	andi	@0, 0x5F			; Perhaps yes make sure we have upper case only
-l1:
-.endmacro
-.macro	ucase
-	cpi		@0, 0x60			; lower case ?
-	brlo	l1
-	andi	@0, 0x5F			; Perhaps yes make sure we have upper case only
-l1:
-.endmacro
 ;--------------------------------------------------------------------------
 ;
 ;	Based on the CRC subroutines from 6502 emulator of daryl rictor
