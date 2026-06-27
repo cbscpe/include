@@ -77,7 +77,6 @@ OpenDirAll:
 	std	Y+Vol_DirNxtPtr+0, r18	; Set address of next directory entry to check
 	std	Y+Vol_DirNxtPtr+1, r19
 	movw	r25:r24, zh:zl
-;-	rcall	debugOpenDirAll;++++
 	call	SD_CARD_READ		; Get first sector of directory
 OpenDirExit:
 	pop	yh
